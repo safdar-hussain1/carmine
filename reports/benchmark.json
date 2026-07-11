@@ -1,0 +1,944 @@
+{
+  "summary": {
+    "legacy_mediapipe": {
+      "containment": {
+        "mean": 0.3372261107116742,
+        "min": 0.2524749699048551,
+        "max": 0.457879149881584
+      },
+      "background_integrity": {
+        "mean": 1.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "lip_texture_corr": {
+        "mean": 0.8106021267739872,
+        "min": 0.5160383769346146,
+        "max": 0.9871471295431876
+      },
+      "identity_ssim": {
+        "mean": 0.9758265106246315,
+        "min": 0.9536276754866345,
+        "max": 0.9853204577717081
+      },
+      "runtime_ms": 7.417613361030817,
+      "n_images": 25
+    },
+    "legacy_dlib": {
+      "containment": {
+        "mean": 0.7914153005394347,
+        "min": 0.658345982497851,
+        "max": 0.876167652216038
+      },
+      "background_integrity": {
+        "mean": 0.9999809122026871,
+        "min": 0.9995228050671809,
+        "max": 1.0
+      },
+      "lip_texture_corr": {
+        "mean": 0.8648776475676072,
+        "min": 0.6232852444399323,
+        "max": 0.9825135386838053
+      },
+      "identity_ssim": {
+        "mean": 0.9968295098562705,
+        "min": 0.9947920488796506,
+        "max": 0.9986169980310633
+      },
+      "runtime_ms": 12.775661759951618,
+      "n_images": 25
+    },
+    "legacy_dlib_swap": {
+      "containment": {
+        "mean": 0.13974413348219472,
+        "min": 0.06233469492223233,
+        "max": 0.29229398776988785
+      },
+      "background_integrity": {
+        "mean": 0.016661640720618043,
+        "min": 0.0,
+        "max": 0.14073953472429648
+      },
+      "lip_texture_corr": {
+        "mean": 0.9081771897674257,
+        "min": 0.7065409482253819,
+        "max": 0.9896477483591556
+      },
+      "identity_ssim": {
+        "mean": 0.9925255627682119,
+        "min": 0.9881484969325062,
+        "max": 0.9962813180632799
+      },
+      "runtime_ms": 12.416773360455409,
+      "n_images": 25
+    },
+    "legacy_gan": {
+      "containment": {
+        "mean": 0.0889977541999753,
+        "min": 0.04507906857201104,
+        "max": 0.16612146636354327
+      },
+      "background_integrity": {
+        "mean": 3.427625683688909e-07,
+        "min": 0.0,
+        "max": 8.569064209222272e-06
+      },
+      "lip_texture_corr": {
+        "mean": -0.20528287662158123,
+        "min": -0.6547384790872666,
+        "max": 0.07414869304964855
+      },
+      "identity_ssim": {
+        "mean": 0.5862941965236271,
+        "min": 0.4609089902208916,
+        "max": 0.7418046729077371
+      },
+      "runtime_ms": 41.159700120042544,
+      "n_images": 25
+    },
+    "new_classic": {
+      "containment": {
+        "mean": 0.8249081709134104,
+        "min": 0.7501399416645119,
+        "max": 0.9032453825950452
+      },
+      "background_integrity": {
+        "mean": 1.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "lip_texture_corr": {
+        "mean": 0.9956192955837928,
+        "min": 0.9787886583253315,
+        "max": 0.9988421709313309
+      },
+      "identity_ssim": {
+        "mean": 0.9984990197558185,
+        "min": 0.9964999683056408,
+        "max": 0.9994182023176053
+      },
+      "runtime_ms": 285.1643967203563,
+      "n_images": 25
+    }
+  },
+  "original_protocol_reproduction": {
+    "legacy_mediapipe": {
+      "mean_ssim_vs_reference": 0.5203447225182739,
+      "legacy_metrics@0.45": {
+        "Accuracy": 0.68,
+        "Precision": 1.0,
+        "Recall": 0.68,
+        "F1-Score": 0.8095238095238095
+      },
+      "n": 25
+    },
+    "legacy_dlib": {
+      "mean_ssim_vs_reference": 0.5300118690686845,
+      "legacy_metrics@0.45": {
+        "Accuracy": 0.88,
+        "Precision": 1.0,
+        "Recall": 0.88,
+        "F1-Score": 0.9361702127659575
+      },
+      "n": 25
+    },
+    "legacy_dlib_swap": {
+      "mean_ssim_vs_reference": 0.5272386933371618,
+      "legacy_metrics@0.45": {
+        "Accuracy": 0.8,
+        "Precision": 1.0,
+        "Recall": 0.8,
+        "F1-Score": 0.888888888888889
+      },
+      "n": 25
+    },
+    "legacy_gan": {
+      "mean_ssim_vs_reference": 0.3777676968124315,
+      "legacy_metrics@0.45": {
+        "Accuracy": 0.24,
+        "Precision": 1.0,
+        "Recall": 0.24,
+        "F1-Score": 0.3870967741935484
+      },
+      "n": 25
+    },
+    "new_classic": {
+      "mean_ssim_vs_reference": 0.530701332583938,
+      "legacy_metrics@0.45": {
+        "Accuracy": 0.88,
+        "Precision": 1.0,
+        "Recall": 0.88,
+        "F1-Score": 0.9361702127659575
+      },
+      "n": 25
+    }
+  },
+  "per_image": {
+    "legacy_mediapipe": [
+      {
+        "containment": 0.2524749699048551,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9143833866893104,
+        "identity_ssim": 0.9817342687184613
+      },
+      {
+        "containment": 0.27577350986801075,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9176591195911086,
+        "identity_ssim": 0.9721658013260185
+      },
+      {
+        "containment": 0.26636367905409875,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.6677320669373186,
+        "identity_ssim": 0.9835770409788366
+      },
+      {
+        "containment": 0.35723740739024124,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.7987432066168483,
+        "identity_ssim": 0.9746989586418948
+      },
+      {
+        "containment": 0.36901800616253694,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.926321617287567,
+        "identity_ssim": 0.9748111767791395
+      },
+      {
+        "containment": 0.30586701319008525,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.7672841465246031,
+        "identity_ssim": 0.9802344256406037
+      },
+      {
+        "containment": 0.2794755862058708,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.722746091346936,
+        "identity_ssim": 0.9766819331175708
+      },
+      {
+        "containment": 0.329707901526157,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9871471295431876,
+        "identity_ssim": 0.9782997110326618
+      },
+      {
+        "containment": 0.2641732936206039,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9518665965716427,
+        "identity_ssim": 0.9842455392714506
+      },
+      {
+        "containment": 0.378499373318124,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9405569452488477,
+        "identity_ssim": 0.976135568784672
+      },
+      {
+        "containment": 0.33146366271569927,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.6310014370469758,
+        "identity_ssim": 0.9758648742711133
+      },
+      {
+        "containment": 0.3650386294888535,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.8898953725562702,
+        "identity_ssim": 0.9740615531456839
+      },
+      {
+        "containment": 0.457879149881584,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.700637191934362,
+        "identity_ssim": 0.9767541378154139
+      },
+      {
+        "containment": 0.29527619232360536,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.8557092277754131,
+        "identity_ssim": 0.9757604611106501
+      },
+      {
+        "containment": 0.34245594275771807,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.6301374433293645,
+        "identity_ssim": 0.979162034725947
+      },
+      {
+        "containment": 0.34027399804997943,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9757801573996926,
+        "identity_ssim": 0.9853204577717081
+      },
+      {
+        "containment": 0.36609036236155634,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9377108374479127,
+        "identity_ssim": 0.9765834443375508
+      },
+      {
+        "containment": 0.2803808602349211,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9543147680054902,
+        "identity_ssim": 0.9809554226988473
+      },
+      {
+        "containment": 0.31262965013109667,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.6694967909505812,
+        "identity_ssim": 0.9536276754866345
+      },
+      {
+        "containment": 0.3731388402901396,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.5160383769346146,
+        "identity_ssim": 0.971430102947013
+      },
+      {
+        "containment": 0.4004692798181359,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.7522727842005195,
+        "identity_ssim": 0.9774846108671289
+      },
+      {
+        "containment": 0.30170572994120276,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.810214038148862,
+        "identity_ssim": 0.9739958388559401
+      },
+      {
+        "containment": 0.4443351607135439,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.6264535998133738,
+        "identity_ssim": 0.973792242067705
+      },
+      {
+        "containment": 0.37104491437365705,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9145534359576126,
+        "identity_ssim": 0.9681115408452223
+      },
+      {
+        "containment": 0.3698796544695789,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.8063974014912634,
+        "identity_ssim": 0.9701739443779236
+      }
+    ],
+    "legacy_dlib": [
+      {
+        "containment": 0.8568532213035086,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.8442087594173336,
+        "identity_ssim": 0.9978449151688483
+      },
+      {
+        "containment": 0.7995361878386167,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.8482626061857133,
+        "identity_ssim": 0.9960668270367172
+      },
+      {
+        "containment": 0.8272230745524708,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.8838719282494787,
+        "identity_ssim": 0.998473946153778
+      },
+      {
+        "containment": 0.8486781147947022,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.96419506711956,
+        "identity_ssim": 0.9972545767822383
+      },
+      {
+        "containment": 0.876167652216038,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.6232852444399323,
+        "identity_ssim": 0.9962432134642861
+      },
+      {
+        "containment": 0.7368776940934761,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9211123713592743,
+        "identity_ssim": 0.9972485763223393
+      },
+      {
+        "containment": 0.6767334986281416,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.7284189804008913,
+        "identity_ssim": 0.9971804138935432
+      },
+      {
+        "containment": 0.7483445162191213,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9825135386838053,
+        "identity_ssim": 0.9949115078157178
+      },
+      {
+        "containment": 0.7933261795868191,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9306883923806677,
+        "identity_ssim": 0.9986169980310633
+      },
+      {
+        "containment": 0.8109033104692673,
+        "background_integrity": 0.9995228050671809,
+        "lip_texture_corr": 0.9247264888529146,
+        "identity_ssim": 0.9966978731996532
+      },
+      {
+        "containment": 0.7200098997728459,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.8619265512755364,
+        "identity_ssim": 0.997885102511745
+      },
+      {
+        "containment": 0.8217483332308461,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.8821367574523662,
+        "identity_ssim": 0.9967780673420669
+      },
+      {
+        "containment": 0.8034615188596255,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9752252954088187,
+        "identity_ssim": 0.9961772104267889
+      },
+      {
+        "containment": 0.7710151499193743,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.7540368298589737,
+        "identity_ssim": 0.9960737266932802
+      },
+      {
+        "containment": 0.8143635488311033,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.8371345381710432,
+        "identity_ssim": 0.9970491295927858
+      },
+      {
+        "containment": 0.8586717101667671,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9517072991538409,
+        "identity_ssim": 0.9964446159569644
+      },
+      {
+        "containment": 0.7155802361280853,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.951092570083087,
+        "identity_ssim": 0.996632473155504
+      },
+      {
+        "containment": 0.7994212813282228,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9578913279308401,
+        "identity_ssim": 0.997610172349146
+      },
+      {
+        "containment": 0.7636027087608225,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.8200517807867319,
+        "identity_ssim": 0.9957556097483082
+      },
+      {
+        "containment": 0.8468831205311407,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.6337905688450636,
+        "identity_ssim": 0.9968812242327417
+      },
+      {
+        "containment": 0.7863166302267961,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.8666133520953794,
+        "identity_ssim": 0.9973839868799255
+      },
+      {
+        "containment": 0.780143969336152,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9554728660224141,
+        "identity_ssim": 0.9967776830004196
+      },
+      {
+        "containment": 0.8724409431487614,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.8842159352224811,
+        "identity_ssim": 0.9975509806611949
+      },
+      {
+        "containment": 0.798734031045307,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.8591965693636331,
+        "identity_ssim": 0.9947920488796506
+      },
+      {
+        "containment": 0.658345982497851,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.7801655704303981,
+        "identity_ssim": 0.9964068671080533
+      }
+    ],
+    "legacy_dlib_swap": [
+      {
+        "containment": 0.10285800377682067,
+        "background_integrity": 0.008642431203614933,
+        "lip_texture_corr": 0.9093724888868007,
+        "identity_ssim": 0.9954146116623959
+      },
+      {
+        "containment": 0.1279676741955888,
+        "background_integrity": 0.0009404796301646923,
+        "lip_texture_corr": 0.8811344335265144,
+        "identity_ssim": 0.9882952767146871
+      },
+      {
+        "containment": 0.06233469492223233,
+        "background_integrity": 0.012577806821257186,
+        "lip_texture_corr": 0.9359044963232441,
+        "identity_ssim": 0.9926466915386366
+      },
+      {
+        "containment": 0.1530525462736226,
+        "background_integrity": 0.001648780225396057,
+        "lip_texture_corr": 0.9803378945978255,
+        "identity_ssim": 0.9937615357992459
+      },
+      {
+        "containment": 0.13222825759353496,
+        "background_integrity": 0.00013669266831599139,
+        "lip_texture_corr": 0.7604588568017748,
+        "identity_ssim": 0.9916757931702865
+      },
+      {
+        "containment": 0.14638542499416232,
+        "background_integrity": 0.02843738386106467,
+        "lip_texture_corr": 0.944798123358315,
+        "identity_ssim": 0.9962813180632799
+      },
+      {
+        "containment": 0.08955430030653481,
+        "background_integrity": 0.0006860805140583754,
+        "lip_texture_corr": 0.8261384533246151,
+        "identity_ssim": 0.9915465445779786
+      },
+      {
+        "containment": 0.19557978955104852,
+        "background_integrity": 0.0034289272335730715,
+        "lip_texture_corr": 0.9896477483591556,
+        "identity_ssim": 0.9893538843580727
+      },
+      {
+        "containment": 0.09933019713879195,
+        "background_integrity": 0.006692928946917695,
+        "lip_texture_corr": 0.9456202533449932,
+        "identity_ssim": 0.9904218191795746
+      },
+      {
+        "containment": 0.15666312072801922,
+        "background_integrity": 0.016362280100315815,
+        "lip_texture_corr": 0.9604809598152306,
+        "identity_ssim": 0.9940484525370742
+      },
+      {
+        "containment": 0.10525152141219808,
+        "background_integrity": 0.012754169772983086,
+        "lip_texture_corr": 0.8998321310862625,
+        "identity_ssim": 0.9939104080544763
+      },
+      {
+        "containment": 0.16599757000699517,
+        "background_integrity": 0.003848698307820971,
+        "lip_texture_corr": 0.9365581876596822,
+        "identity_ssim": 0.9949216870268885
+      },
+      {
+        "containment": 0.29229398776988785,
+        "background_integrity": 0.013999569849545741,
+        "lip_texture_corr": 0.983674090630007,
+        "identity_ssim": 0.9953377142579133
+      },
+      {
+        "containment": 0.15099248566971174,
+        "background_integrity": 0.0002920776953589258,
+        "lip_texture_corr": 0.8023909810928287,
+        "identity_ssim": 0.9896622533065911
+      },
+      {
+        "containment": 0.1405644018990485,
+        "background_integrity": 0.14073953472429648,
+        "lip_texture_corr": 0.8994029777773029,
+        "identity_ssim": 0.9948719996592075
+      },
+      {
+        "containment": 0.20231200409038333,
+        "background_integrity": 0.006043236449701362,
+        "lip_texture_corr": 0.9659840497606362,
+        "identity_ssim": 0.9944149548046008
+      },
+      {
+        "containment": 0.15300363982818568,
+        "background_integrity": 0.01586436235477012,
+        "lip_texture_corr": 0.9669148434761636,
+        "identity_ssim": 0.992540308974084
+      },
+      {
+        "containment": 0.0969147765769279,
+        "background_integrity": 0.0023555517833925605,
+        "lip_texture_corr": 0.9760339108724141,
+        "identity_ssim": 0.9934978918210368
+      },
+      {
+        "containment": 0.14392922837105754,
+        "background_integrity": 7.407832229327368e-05,
+        "lip_texture_corr": 0.8739522830648723,
+        "identity_ssim": 0.9890088805399435
+      },
+      {
+        "containment": 0.1712427652654476,
+        "background_integrity": 0.04522368253123074,
+        "lip_texture_corr": 0.7065409482253819,
+        "identity_ssim": 0.9933156370211905
+      },
+      {
+        "containment": 0.11688872607940713,
+        "background_integrity": 0.002262138696670741,
+        "lip_texture_corr": 0.9283775881348991,
+        "identity_ssim": 0.9951073586864803
+      },
+      {
+        "containment": 0.12332585891119469,
+        "background_integrity": 0.0011443280334546067,
+        "lip_texture_corr": 0.9758025289351954,
+        "identity_ssim": 0.9917029519211679
+      },
+      {
+        "containment": 0.1471488760458419,
+        "background_integrity": 0.05606605048927781,
+        "lip_texture_corr": 0.8922506107680265,
+        "identity_ssim": 0.9941261602191986
+      },
+      {
+        "containment": 0.11744099632662466,
+        "background_integrity": 0.03631974779997614,
+        "lip_texture_corr": 0.9092276512278255,
+        "identity_ssim": 0.9891264383787803
+      },
+      {
+        "containment": 0.10034248932160021,
+        "background_integrity": 0.0,
+        "lip_texture_corr": 0.8535932531356745,
+        "identity_ssim": 0.9881484969325062
+      }
+    ],
+    "legacy_gan": [
+      {
+        "containment": 0.05462830630198647,
+        "background_integrity": 0.0,
+        "lip_texture_corr": -0.22183017732797072,
+        "identity_ssim": 0.6791859898006173
+      },
+      {
+        "containment": 0.09776215948150757,
+        "background_integrity": 0.0,
+        "lip_texture_corr": 0.06889481007601854,
+        "identity_ssim": 0.5079703904402461
+      },
+      {
+        "containment": 0.04507906857201104,
+        "background_integrity": 0.0,
+        "lip_texture_corr": -0.10418484640331802,
+        "identity_ssim": 0.520088572833323
+      },
+      {
+        "containment": 0.08254290037193393,
+        "background_integrity": 0.0,
+        "lip_texture_corr": -0.6053065659251864,
+        "identity_ssim": 0.5603994445085124
+      },
+      {
+        "containment": 0.09907712324910305,
+        "background_integrity": 0.0,
+        "lip_texture_corr": 0.027278320928388722,
+        "identity_ssim": 0.5124481164101572
+      },
+      {
+        "containment": 0.05959365518771304,
+        "background_integrity": 0.0,
+        "lip_texture_corr": -0.5195239398058304,
+        "identity_ssim": 0.7184018073511559
+      },
+      {
+        "containment": 0.08010882314215943,
+        "background_integrity": 0.0,
+        "lip_texture_corr": -0.2652381636759203,
+        "identity_ssim": 0.6316742970923866
+      },
+      {
+        "containment": 0.12042674162563603,
+        "background_integrity": 0.0,
+        "lip_texture_corr": 0.07414869304964855,
+        "identity_ssim": 0.6071131538570442
+      },
+      {
+        "containment": 0.04825861947047694,
+        "background_integrity": 0.0,
+        "lip_texture_corr": -0.15876313975572984,
+        "identity_ssim": 0.48187120086025464
+      },
+      {
+        "containment": 0.08561917511892046,
+        "background_integrity": 0.0,
+        "lip_texture_corr": 0.06403447738133967,
+        "identity_ssim": 0.7184912200164044
+      },
+      {
+        "containment": 0.07237398289542565,
+        "background_integrity": 0.0,
+        "lip_texture_corr": -0.2870989189339309,
+        "identity_ssim": 0.6156833904159267
+      },
+      {
+        "containment": 0.09629886716506184,
+        "background_integrity": 0.0,
+        "lip_texture_corr": -0.22381272432084928,
+        "identity_ssim": 0.7079680273844199
+      },
+      {
+        "containment": 0.11722573979991573,
+        "background_integrity": 0.0,
+        "lip_texture_corr": -0.04801670368832879,
+        "identity_ssim": 0.5281495134496426
+      },
+      {
+        "containment": 0.09018028475269442,
+        "background_integrity": 0.0,
+        "lip_texture_corr": 0.0735603917536872,
+        "identity_ssim": 0.47181700017817285
+      },
+      {
+        "containment": 0.06643782009311912,
+        "background_integrity": 8.569064209222272e-06,
+        "lip_texture_corr": -0.27140015938703,
+        "identity_ssim": 0.7191112841455899
+      },
+      {
+        "containment": 0.06768115526929085,
+        "background_integrity": 0.0,
+        "lip_texture_corr": -0.013114132348242909,
+        "identity_ssim": 0.4609089902208916
+      },
+      {
+        "containment": 0.09159565070677221,
+        "background_integrity": 0.0,
+        "lip_texture_corr": -0.35564298324921795,
+        "identity_ssim": 0.48866024052830537
+      },
+      {
+        "containment": 0.06868257983571967,
+        "background_integrity": 0.0,
+        "lip_texture_corr": -0.1461508198754408,
+        "identity_ssim": 0.5533710547918355
+      },
+      {
+        "containment": 0.16612146636354327,
+        "background_integrity": 0.0,
+        "lip_texture_corr": -0.6547384790872666,
+        "identity_ssim": 0.7050317140000188
+      },
+      {
+        "containment": 0.10113206152216142,
+        "background_integrity": 0.0,
+        "lip_texture_corr": -0.15189061099168952,
+        "identity_ssim": 0.5443905614665914
+      },
+      {
+        "containment": 0.08638486408558924,
+        "background_integrity": 0.0,
+        "lip_texture_corr": -0.1438567488296992,
+        "identity_ssim": 0.4833932926369303
+      },
+      {
+        "containment": 0.09766807640545151,
+        "background_integrity": 0.0,
+        "lip_texture_corr": -0.5556824730947023,
+        "identity_ssim": 0.6246424085085733
+      },
+      {
+        "containment": 0.10134115823164455,
+        "background_integrity": 0.0,
+        "lip_texture_corr": -0.21017165194903942,
+        "identity_ssim": 0.4824387879147831
+      },
+      {
+        "containment": 0.11524002908075283,
+        "background_integrity": 0.0,
+        "lip_texture_corr": -0.1548730271387619,
+        "identity_ssim": 0.5923397813711581
+      },
+      {
+        "containment": 0.11348354627079198,
+        "background_integrity": 0.0,
+        "lip_texture_corr": -0.3486923429404591,
+        "identity_ssim": 0.7418046729077371
+      }
+    ],
+    "new_classic": [
+      {
+        "containment": 0.7991617521260878,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9983955461064431,
+        "identity_ssim": 0.9992049215190351
+      },
+      {
+        "containment": 0.7645948423429543,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9986779702996631,
+        "identity_ssim": 0.9988834719745197
+      },
+      {
+        "containment": 0.8406502886515864,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9924737015446226,
+        "identity_ssim": 0.999115167066492
+      },
+      {
+        "containment": 0.8084211866432868,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9977806484206121,
+        "identity_ssim": 0.9990860220179901
+      },
+      {
+        "containment": 0.8039009433881498,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9939598340252737,
+        "identity_ssim": 0.9990815357368714
+      },
+      {
+        "containment": 0.8678797987936944,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9975198209047976,
+        "identity_ssim": 0.9980832470361172
+      },
+      {
+        "containment": 0.8456393334974965,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9932796186034497,
+        "identity_ssim": 0.99824838161849
+      },
+      {
+        "containment": 0.798061250750622,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9988421709313309,
+        "identity_ssim": 0.9988995315451913
+      },
+      {
+        "containment": 0.8159797776033093,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9988351116026327,
+        "identity_ssim": 0.9991248524059524
+      },
+      {
+        "containment": 0.8290058660368995,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.99856455930639,
+        "identity_ssim": 0.9989608158089135
+      },
+      {
+        "containment": 0.8246549996389924,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.989780173421713,
+        "identity_ssim": 0.9981463018168866
+      },
+      {
+        "containment": 0.80759662187461,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9974362127973692,
+        "identity_ssim": 0.9986308394727779
+      },
+      {
+        "containment": 0.9032453825950452,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9964053558782667,
+        "identity_ssim": 0.9981774307240979
+      },
+      {
+        "containment": 0.7501399416645119,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9984697541767887,
+        "identity_ssim": 0.9983218291790572
+      },
+      {
+        "containment": 0.8658495280169568,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9968228425254321,
+        "identity_ssim": 0.9988307130311651
+      },
+      {
+        "containment": 0.8251347503559208,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9987943127368824,
+        "identity_ssim": 0.9994182023176053
+      },
+      {
+        "containment": 0.8414384945045257,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9969044284465823,
+        "identity_ssim": 0.9987349900555642
+      },
+      {
+        "containment": 0.8226212522121319,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9985212079674851,
+        "identity_ssim": 0.9989625737024133
+      },
+      {
+        "containment": 0.8315668685160189,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9967672760539211,
+        "identity_ssim": 0.9976207946761844
+      },
+      {
+        "containment": 0.8087747303306011,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9787886583253315,
+        "identity_ssim": 0.9974622993673748
+      },
+      {
+        "containment": 0.8580589456068136,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9951324017036015,
+        "identity_ssim": 0.9984717838449018
+      },
+      {
+        "containment": 0.8355051213707235,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.997530944433995,
+        "identity_ssim": 0.9979232228612621
+      },
+      {
+        "containment": 0.8375399628355039,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9877798201525951,
+        "identity_ssim": 0.9981805815672246
+      },
+      {
+        "containment": 0.8063063861308061,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9982860482663959,
+        "identity_ssim": 0.9984060162437322
+      },
+      {
+        "containment": 0.8309762473480129,
+        "background_integrity": 1.0,
+        "lip_texture_corr": 0.9947339709632412,
+        "identity_ssim": 0.9964999683056408
+      }
+    ]
+  },
+  "skipped": [
+    [
+      "24.jpg",
+      "no face (dlib)"
+    ]
+  ]
+}

@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Environments
+.venv/
+venv/
+
+# Model assets & datasets (fetched, never committed)
+*.task
+*.dat
+*.dat.bz2
+data/
+
+# OS
+.DS_Store

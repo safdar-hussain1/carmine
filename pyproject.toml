@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "virtual-makeup"
+version = "1.0.0"
+description = "Landmark-driven virtual makeup that recolors lips, lids and cheeks without destroying skin texture"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Safdar Hussain", email = "safdar.eryx@gmail.com" }]
+dependencies = [
+    "numpy>=1.26",
+    "opencv-python>=4.8,<5",
+    "mediapipe>=0.10.14",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "scikit-image>=0.24", "matplotlib>=3.8", "dlib>=19.24"]
+
+[project.scripts]
+vmakeup = "virtual_makeup.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

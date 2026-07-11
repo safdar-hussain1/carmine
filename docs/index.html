@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Virtual Makeup — the vanity, and the autopsy</title>
+<meta name="description" content="A landmark-driven virtual makeup engine with a live in-browser try-on, plus the forensic audit of the 2024 course project it replaced.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,340;9..144,560;9..144,640&family=Karla:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"
+        integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC"
+        crossorigin="anonymous"></script>
+<script src="./data.js"></script>
+<style>
+  :root {
+    --stage: #1a1216;          /* page plane */
+    --velvet: #241a20;         /* card surface */
+    --velvet-2: #2c2027;
+    --ink: #f5eef0;
+    --ink-2: #c4b2ba;
+    --muted: #93818a;
+    --hairline: #3a2c34;
+    --rose: #d76a86;
+    --rose-deep: #b34e69;
+    --bulb: #e8c98a;
+    --gold: #bb862a;
+    /* fixed method slots (validated dark palette) */
+    --m-mediapipe: #5b8fdd;
+    --m-dlib: #2f9d7d;
+    --m-swap: #bb862a;
+    --m-gan: #d05252;
+    --m-rewrite: #d76a86;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+  body {
+    background: var(--stage);
+    color: var(--ink);
+    font-family: "Karla", system-ui, sans-serif;
+    font-size: 16.5px;
+    line-height: 1.55;
+  }
+  a { color: var(--rose); text-underline-offset: 3px; }
+  a:focus-visible, button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--bulb); outline-offset: 3px;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  .display { font-family: "Fraunces", serif; font-weight: 560; letter-spacing: -0.01em; }
+
+  /* ---------- header ---------- */
+  header.site {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 26px 0 0;
+  }
+  .brand { font-family: "Fraunces", serif; font-size: 1.05rem; color: var(--ink-2); }
+  .brand b { color: var(--ink); font-weight: 640; }
+  nav.site a { color: var(--muted); text-decoration: none; font-size: .85rem; margin-left: 18px; }
+  nav.site a:hover { color: var(--ink); }
+
+  /* ---------- hero / vanity ---------- */
+  .vanity { display: grid; grid-template-columns: minmax(320px, 460px) 1fr; gap: 56px; align-items: center; padding: 56px 0 30px; }
+  @media (max-width: 900px) { .vanity { grid-template-columns: 1fr; gap: 34px; } }
+
+  .mirror-frame { position: relative; padding: 26px; }
+  .mirror {
+    position: relative;
+    border-radius: 999px 999px 28px 28px;
+    background: var(--velvet);
+    border: 1px solid var(--hairline);
+    box-shadow: 0 0 0 10px #211820, 0 30px 60px -20px rgba(0,0,0,.7),
+                inset 0 0 60px rgba(232,201,138,.05);
+    overflow: hidden;
+    aspect-ratio: 4 / 5;
+  }
+  .mirror canvas { width: 100%; height: 100%; display: block; object-fit: cover; }
+  .mirror .status {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    color: var(--muted); font-size: .9rem; text-align: center; padding: 20px;
+    background: radial-gradient(ellipse at 50% 30%, #2c2027 0%, #241a20 70%);
+  }
+  .bulb { position: absolute; width: 12px; height: 12px; border-radius: 50%;
+    background: #4a3a30; box-shadow: none; transition: background .6s, box-shadow .6s; }
+  .lit .bulb { background: var(--bulb); box-shadow: 0 0 14px 3px rgba(232,201,138,.45); }
+
+  .console h1 { font-size: clamp(2.1rem, 4.6vw, 3.4rem); line-height: 1.06; font-weight: 640; margin-bottom: 18px; }
+  .console h1 em { font-style: italic; color: var(--rose); }
+  .console > p.lede { color: var(--ink-2); max-width: 54ch; margin-bottom: 26px; }
+  .console p.lede a { color: var(--ink-2); }
+
+  .products { display: grid; gap: 18px; }
+  .product { display: grid; grid-template-columns: 92px 1fr 118px; align-items: center; gap: 14px; }
+  .product .name { font-size: .8rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .swatches { display: flex; gap: 8px; }
+  .bullet {
+    width: 26px; height: 34px; border-radius: 5px 5px 7px 7px; border: 1px solid var(--hairline);
+    cursor: pointer; padding: 0; position: relative;
+    clip-path: polygon(0 22%, 55% 0, 100% 14%, 100% 100%, 0 100%);
+  }
+  .bullet[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 2px; }
+  input[type="range"] { width: 100%; accent-color: var(--rose); background: transparent; }
+  .product output { font-variant-numeric: tabular-nums; color: var(--ink-2); font-size: .85rem; text-align: right; }
+
+  .bench-controls { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .btn {
+    font: inherit; font-size: .9rem; color: var(--ink); background: var(--velvet-2);
+    border: 1px solid var(--hairline); border-radius: 999px; padding: 9px 18px; cursor: pointer;
+  }
+  .btn:hover { border-color: var(--rose-deep); }
+  .btn.primary { background: var(--rose-deep); border-color: var(--rose-deep); }
+  .btn.primary:hover { background: var(--rose); }
+  .privacy { font-size: .78rem; color: var(--muted); flex-basis: 100%; }
+
+  /* ---------- sections ---------- */
+  section { padding: 64px 0 8px; }
+  .kicker { font-size: .78rem; letter-spacing: .22em; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; }
+  h2 { font-family: "Fraunces", serif; font-weight: 560; font-size: clamp(1.6rem, 3vw, 2.3rem); margin-bottom: 12px; }
+  .sub { color: var(--ink-2); max-width: 68ch; margin-bottom: 34px; }
+
+  /* autopsy cards */
+  .bugs { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+  .bug {
+    background: var(--velvet); border: 1px solid var(--hairline); border-radius: 14px;
+    padding: 20px 20px 18px; position: relative; overflow: hidden;
+  }
+  .bug::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px;
+    background: var(--tag, var(--rose));
+  }
+  .bug h3 { font-size: 1.02rem; margin-bottom: 8px; }
+  .bug p { font-size: .9rem; color: var(--ink-2); }
+  .bug code {
+    display: block; margin: 10px 0 8px; padding: 8px 10px; border-radius: 8px;
+    background: #171016; color: #d9c7ce; font-size: .78rem; overflow-x: auto; white-space: pre;
+  }
+  .bug .verdict { font-size: .78rem; color: var(--muted); margin-top: 8px; }
+  .bug .verdict b { color: var(--ink-2); }
+
+  /* charts */
+  .panel { background: var(--velvet); border: 1px solid var(--hairline); border-radius: 16px; padding: 26px 26px 18px; margin-bottom: 22px; }
+  .panel h3 { font-size: 1.05rem; margin-bottom: 4px; }
+  .panel .note { font-size: .85rem; color: var(--muted); margin-bottom: 18px; max-width: 78ch; }
+  .panel .note b { color: var(--ink-2); }
+  .chartbox { position: relative; height: 240px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 4px 0 16px; }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; font-size: .82rem; color: var(--ink-2); }
+  .legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  @media (max-width: 820px) { .grid2 { grid-template-columns: 1fr; } }
+
+  table.claims { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  table.claims th, table.claims td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--hairline); }
+  table.claims th { color: var(--muted); font-weight: 500; font-size: .78rem; letter-spacing: .1em; text-transform: uppercase; }
+  table.claims td { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  table.claims td:first-child { color: var(--ink); }
+  .ok { color: #7dc9a4; }
+  .bad { color: #e08585; }
+
+  footer { padding: 56px 0 44px; color: var(--muted); font-size: .85rem; border-top: 1px solid var(--hairline); margin-top: 70px; }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 10px 26px; justify-content: space-between; }
+  footer a { color: var(--ink-2); }
+</style>
+</head>
+<body>
+
+<header class="site wrap">
+  <div class="brand"><b>Virtual Makeup</b> · rebuilt 2026</div>
+  <nav class="site" aria-label="Sections">
+    <a href="#autopsy">The autopsy</a>
+    <a href="#bench">Benchmark</a>
+    <a href="#claims">Claims check</a>
+    <a href="https://github.com/safdar-hussain1/virtual-makeup">GitHub</a>
+  </nav>
+</header>
+
+<!-- ═══════════ THE VANITY (hero try-on) ═══════════ -->
+<div class="vanity wrap">
+  <div class="mirror-frame" id="mirrorFrame">
+    <div class="mirror">
+      <canvas id="stage" width="640" height="800" aria-label="Makeup try-on preview"></canvas>
+      <div class="status" id="status">warming up the mirror…<br><span style="font-size:.78rem">(loading FaceMesh, ~4 MB)</span></div>
+    </div>
+  </div>
+
+  <div class="console">
+    <h1 class="display">Makeup that lands<br>where it’s <em>aimed.</em></h1>
+    <p class="lede">
+      This mirror runs the same 468-point FaceMesh topology as the
+      <a href="https://github.com/safdar-hussain1/virtual-makeup">Python engine</a> —
+      lipstick that skips the teeth, blush that scales with the face, pigment that keeps
+      skin texture. My 2024 course project got all of that wrong;
+      <a href="#autopsy">the autopsy is below</a>.
+    </p>
+
+    <div class="products" id="products">
+      <div class="product">
+        <span class="name">Lipstick</span>
+        <span class="swatches" data-product="lip" role="group" aria-label="Lipstick shades"></span>
+        <span><input type="range" id="lipI" min="0" max="100" value="75" aria-label="Lipstick intensity"><output for="lipI" id="lipO">0.75</output></span>
+      </div>
+      <div class="product">
+        <span class="name">Eyeshadow</span>
+        <span class="swatches" data-product="shadow" role="group" aria-label="Eyeshadow shades"></span>
+        <span><input type="range" id="shadowI" min="0" max="100" value="45" aria-label="Eyeshadow intensity"><output id="shadowO">0.45</output></span>
+      </div>
+      <div class="product">
+        <span class="name">Eyeliner</span>
+        <span class="swatches" data-product="liner" role="group" aria-label="Eyeliner shades"></span>
+        <span><input type="range" id="linerI" min="0" max="100" value="80" aria-label="Eyeliner intensity"><output id="linerO">0.80</output></span>
+      </div>
+      <div class="product">
+        <span class="name">Blush</span>
+        <span class="swatches" data-product="blush" role="group" aria-label="Blush shades"></span>
+        <span><input type="range" id="blushI" min="0" max="100" value="35" aria-label="Blush intensity"><output id="blushO">0.35</output></span>
+      </div>
+    </div>
+
+    <div class="bench-controls">
+      <button class="btn primary" id="uploadBtn">Try your own photo</button>
+      <input type="file" id="fileInput" accept="image/*" hidden>
+      <button class="btn" id="demoBtn">Use the demo portrait</button>
+      <button class="btn" id="bareBtn" aria-pressed="false">Hold to compare</button>
+      <span class="privacy">Photos are processed entirely in your browser — nothing is uploaded anywhere.</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ THE AUTOPSY ═══════════ -->
+<section id="autopsy" class="wrap">
+  <div class="kicker">The autopsy</div>
+  <h2>Five ways the 2024 project was broken</h2>
+  <p class="sub">
+    Every finding below was verified by re-running the original code, bug-for-bug, against
+    the same dataset (<code style="font-size:.85em">src/virtual_makeup/legacy.py</code> in the repo).
+  </p>
+  <div class="bugs">
+    <div class="bug" style="--tag:var(--m-mediapipe)">
+      <h3>1 · Wrong landmark topology</h3>
+      <p>The “MediaPipe” pipeline detected a 468-point mesh, then indexed it with <em>dlib’s</em> 68-point region numbers.</p>
+      <code>lips = landmarks[48:60]   # chin, on a 468-pt mesh</code>
+      <p class="verdict"><b>Effect:</b> “lipstick” rendered as purple polygons across the chin and jaw.</p>
+    </div>
+    <div class="bug" style="--tag:var(--m-swap)">
+      <h3>2 · The blue-face save bug</h3>
+      <p>Outputs were saved through an RGB→BGR conversion — on images that were already BGR.</p>
+      <code>cv2.imwrite(f, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))</code>
+      <p class="verdict"><b>Effect:</b> red and blue swapped across the whole photo. Every saved face was blue.</p>
+    </div>
+    <div class="bug" style="--tag:var(--m-gan)">
+      <h3>3 · The “GAN” was never trained</h3>
+      <p>A 3-layer conv net with random weights ran <code style="display:inline;padding:1px 5px">predict()</code> — there is no training loop anywhere in the notebook.</p>
+      <p class="verdict"><b>Effect:</b> its “makeup” is noise by construction — and metrics were still reported for it.</p>
+    </div>
+    <div class="bug" style="--tag:var(--m-dlib)">
+      <h3>4 · Destructive rendering</h3>
+      <p>Opaque <code style="display:inline;padding:1px 5px">fillPoly</code> lipstick over the whole mouth (teeth included), eyeshadow at fixed ±10/±20&nbsp;<em>pixel</em> offsets, everything composited additively.</p>
+      <p class="verdict"><b>Effect:</b> painted teeth, effects that fit exactly one image size, blown-out brightness.</p>
+    </div>
+    <div class="bug" style="--tag:var(--m-rewrite)">
+      <h3>5 · An evaluation that couldn’t fail</h3>
+      <p>The reported “accuracy 0.88, precision 1.0” used a protocol where <code style="display:inline;padding:1px 5px">y_true</code> is all ones.</p>
+      <p class="verdict"><b>Effect:</b> precision is 1.0 for <em>any</em> output — including untrained noise. The headline metric was unfalsifiable.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ BENCHMARK ═══════════ -->
+<section id="bench" class="wrap">
+  <div class="kicker">Benchmark · 25 photos, paired makeup dataset</div>
+  <h2>Old pipelines vs the rewrite</h2>
+  <p class="sub">
+    Each method ran on the no-makeup half of the dataset the course project used.
+    Colors are fixed per method across every chart.
+  </p>
+  <div class="legend" id="methodLegend"></div>
+
+  <div class="grid2">
+    <div class="panel">
+      <h3>Where the pigment landed</h3>
+      <p class="note">Share of edit energy inside legitimate makeup regions (lips, lids, lashes, cheeks). The rewrite’s remainder is invisible ±1-count feather falloff — at any non-zero mask threshold it is 1.0 by construction.</p>
+      <div class="chartbox"><canvas id="cContain"></canvas></div>
+    </div>
+    <div class="panel">
+      <h3>What the background suffered</h3>
+      <p class="note">Fraction of pixels outside the face left <b>bit-identical</b>. The blue-face bug recolors ~98% of the image; the untrained “GAN” replaces all of it.</p>
+      <div class="chartbox"><canvas id="cBackground"></canvas></div>
+    </div>
+    <div class="panel">
+      <h3>Did lips still look like lips?</h3>
+      <p class="note">Correlation of lip-region lightness before → after. Flat fills erase pores and creases. (The 2024 MediaPipe row survives only because it usually <b>missed</b> the lips.)</p>
+      <div class="chartbox"><canvas id="cTexture"></canvas></div>
+    </div>
+    <div class="panel">
+      <h3>The metric that couldn’t fail</h3>
+      <p class="note">The original evaluation: grayscale SSIM vs a reference photo, “accuracy” = share above 0.45. A <b>completely blue face scores 0.527</b> — statistically identical to the best method — because grayscale SSIM is blind to color, and makeup <em>is</em> color. “Precision” was 1.0 for every row.</p>
+      <div class="chartbox"><canvas id="cProtocol"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ CLAIMS CHECK ═══════════ -->
+<section id="claims" class="wrap">
+  <div class="kicker">Claims check</div>
+  <h2>What the 2024 report said, vs what re-running it gives</h2>
+  <p class="sub">The audit only counts if the old numbers replicate — and they do. That’s exactly the problem: the protocol also hands good scores to broken code.</p>
+  <div class="panel">
+    <table class="claims">
+      <thead><tr><th>2024 claim</th><th>Claimed</th><th>Reproduced (this repo)</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td>SSIM, MediaPipe pipeline</td><td>0.515</td><td id="rp-mp">—</td><td class="ok">replicates — but the pipeline paints the chin</td></tr>
+        <tr><td>SSIM, dlib pipeline</td><td>0.518</td><td id="rp-dl">—</td><td class="ok">replicates — metric can’t see the painted teeth</td></tr>
+        <tr><td>SSIM, “GAN”</td><td>0.043</td><td id="rp-gan">—</td><td class="bad">irreproducible by construction — random, unseeded weights</td></tr>
+        <tr><td>“Accuracy 0.88, precision 1.0”</td><td>0.88 / 1.0</td><td id="rp-acc">—</td><td class="bad">precision is 1.0 for <em>everything</em> — y_true was all ones</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>Safdar Hussain · rebuilt from a 2024 Digital Image Processing course project</span>
+    <span>
+      <a href="https://github.com/safdar-hussain1/virtual-makeup">Repository</a> ·
+      <a href="https://github.com/safdar-hussain1/virtual-makeup/blob/main/notebooks/01_audit_and_rewrite.ipynb">Audit notebook</a>
+    </span>
+  </div>
+</footer>
+
+<script>
+/* ═══════════ charts ═══════════ */
+(function () {
+  const css = getComputedStyle(document.documentElement);
+  const C = name => css.getPropertyValue(name).trim();
+  const METHODS = ["legacy_mediapipe", "legacy_dlib", "legacy_dlib_swap", "legacy_gan", "new_classic"];
+  const COLORS = {
+    legacy_mediapipe: C("--m-mediapipe"), legacy_dlib: C("--m-dlib"),
+    legacy_dlib_swap: C("--m-swap"), legacy_gan: C("--m-gan"), new_classic: C("--m-rewrite"),
+  };
+  const LABELS = {
+    legacy_mediapipe: "2024 MediaPipe", legacy_dlib: "2024 dlib",
+    legacy_dlib_swap: "2024 dlib (as saved)", legacy_gan: "2024 “GAN”", new_classic: "Rewrite",
+  };
+  const legend = document.getElementById("methodLegend");
+  METHODS.forEach(m => {
+    const s = document.createElement("span");
+    s.innerHTML = `<i style="background:${COLORS[m]}"></i>${LABELS[m]}`;
+    legend.appendChild(s);
+  });
+
+  Chart.defaults.font.family = '"Karla", system-ui, sans-serif';
+  Chart.defaults.color = C("--muted");
+
+  const valueLabels = {
+    id: "valueLabels",
+    afterDatasetsDraw(chart) {
+      const { ctx } = chart;
+      ctx.save();
+      ctx.font = "600 11px Karla, sans-serif";
+      ctx.fillStyle = C("--ink-2");
+      chart.getDatasetMeta(0).data.forEach((bar, i) => {
+        const v = chart.data.datasets[0].data[i];
+        ctx.textAlign = "left"; ctx.textBaseline = "middle";
+        ctx.fillText(Number(v).toFixed(v < 0 ? 2 : 3).replace(/^0\./, "."), Math.max(bar.x, chart.scales.x.getPixelForValue(0)) + 6, bar.y);
+      });
+      ctx.restore();
+    },
+  };
+
+  function hbar(id, values, { min = 0, max = 1.06, threshold = null } = {}) {
+    new Chart(document.getElementById(id), {
+      type: "bar",
+      data: {
+        labels: METHODS.map(m => LABELS[m]),
+        datasets: [{ data: values, backgroundColor: METHODS.map(m => COLORS[m]),
+                     borderRadius: 4, barThickness: 17 }],
+      },
+      options: {
+        indexAxis: "y", maintainAspectRatio: false,
+        layout: { padding: { right: 40 } },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: c => ` ${c.parsed.x.toFixed(3)}` } },
+          annotationLine: { threshold },
+        },
+        scales: {
+          x: { min, max, grid: { color: C("--hairline") }, border: { display: false }, ticks: { maxTicksLimit: 6 } },
+          y: { grid: { display: false }, border: { display: false }, ticks: { color: C("--ink-2") } },
+        },
+      },
+      plugins: [valueLabels, {
+        id: "annotationLine",
+        afterDraw(chart, _a, opts) {
+          const thr = opts && opts.threshold;
+          if (thr == null) return;
+          const x = chart.scales.x.getPixelForValue(thr);
+          const { ctx, chartArea } = chart;
+          ctx.save();
+          ctx.strokeStyle = C("--muted"); ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(x, chartArea.top); ctx.lineTo(x, chartArea.bottom); ctx.stroke();
+          ctx.font = "10px Karla, sans-serif"; ctx.fillStyle = C("--muted");
+          ctx.textAlign = "left";
+          ctx.fillText("0.45 “accuracy” cutoff", x + 5, chartArea.top + 10);
+          ctx.restore();
+        },
+      }],
+    });
+  }
+
+  const S = BENCH.summary, P = BENCH.original_protocol;
+  hbar("cContain", METHODS.map(m => S[m].containment));
+  hbar("cBackground", METHODS.map(m => S[m].background_integrity));
+  hbar("cTexture", METHODS.map(m => S[m].lip_texture_corr), { min: -0.3 });
+  hbar("cProtocol", METHODS.map(m => P[m].ssim), { max: 0.7, threshold: 0.45 });
+
+  const f3 = x => x.toFixed(3);
+  document.getElementById("rp-mp").textContent = f3(P.legacy_mediapipe.ssim);
+  document.getElementById("rp-dl").textContent = f3(P.legacy_dlib.ssim);
+  document.getElementById("rp-gan").textContent = f3(P.legacy_gan.ssim);
+  document.getElementById("rp-acc").textContent =
+    `${P.legacy_dlib.accuracy.toFixed(2)} / ${P.legacy_dlib.precision.toFixed(1)} — and ${P.legacy_gan.precision.toFixed(1)} for noise`;
+})();
+
+/* ═══════════ the mirror (live try-on) ═══════════ */
+(async function () {
+  // FaceMesh region indices — identical to src/virtual_makeup/regions.py
+  const LIPS_OUTER = [61,185,40,39,37,0,267,269,270,409,291,375,321,405,314,17,84,181,91,146];
+  const LIPS_INNER = [78,191,80,81,82,13,312,311,310,415,308,324,318,402,317,14,87,178,88,95];
+  const R_EYE = [33,7,163,144,145,153,154,155,133,173,157,158,159,160,161,246];
+  const L_EYE = [263,249,390,373,374,380,381,382,362,398,384,385,386,387,388,466];
+  const R_UPPER = [133,173,157,158,159,160,161,246,33];
+  const L_UPPER = [362,398,384,385,386,387,388,466,263];
+  const R_BROW = [55,65,52,53,46,70];
+  const L_BROW = [285,295,282,283,276,300];
+  const FACE_OVAL = [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109];
+  const R_CHEEK = 50, L_CHEEK = 280;
+
+  const SHADES = {
+    lip:    ["#B03A5B", "#C4707F", "#8E1B3A", "#A6543C", "#7C2D4E"],
+    shadow: ["#8A5A44", "#5C3A6E", "#3E5A7A", "#6E6A4A", "#874F5C"],
+    liner:  ["#1B1B1B", "#3B2A20", "#22304A"],
+    blush:  ["#D96C6C", "#E08A7A", "#C25B5B"],
+  };
+  const state = {
+    lip: { color: SHADES.lip[0], i: 0.75 },
+    shadow: { color: SHADES.shadow[0], i: 0.45 },
+    liner: { color: SHADES.liner[0], i: 0.80 },
+    blush: { color: SHADES.blush[0], i: 0.35 },
+    bare: false,
+  };
+
+  // swatch buttons
+  document.querySelectorAll(".swatches").forEach(group => {
+    const product = group.dataset.product;
+    SHADES[product].forEach((hex, k) => {
+      const b = document.createElement("button");
+      b.className = "bullet"; b.style.background = hex;
+      b.setAttribute("aria-label", `${product} shade ${hex}`);
+      b.setAttribute("aria-pressed", k === 0 ? "true" : "false");
+      b.addEventListener("click", () => {
+        group.querySelectorAll(".bullet").forEach(x => x.setAttribute("aria-pressed", "false"));
+        b.setAttribute("aria-pressed", "true");
+        state[product].color = hex; render();
+      });
+      group.appendChild(b);
+    });
+  });
+  [["lipI","lip","lipO"],["shadowI","shadow","shadowO"],["linerI","liner","linerO"],["blushI","blush","blushO"]]
+    .forEach(([id, product, out]) => {
+      const el = document.getElementById(id);
+      el.addEventListener("input", () => {
+        state[product].i = el.value / 100;
+        document.getElementById(out).value = (el.value / 100).toFixed(2);
+        render();
+      });
+    });
+
+  const stage = document.getElementById("stage");
+  const ctx = stage.getContext("2d");
+  const statusEl = document.getElementById("status");
+  let photo = null, pts = null, iod = 0, landmarker = null;
+
+  function say(html) { statusEl.innerHTML = html; statusEl.style.display = "grid"; }
+  function hush() { statusEl.style.display = "none"; }
+
+  try {
+    const vision = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/vision_bundle.mjs");
+    const files = await vision.FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm");
+    landmarker = await vision.FaceLandmarker.createFromOptions(files, {
+      baseOptions: {
+        modelAssetPath:
+          "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+        delegate: "CPU",   // static images; avoids requiring WebGL
+      },
+      runningMode: "IMAGE", numFaces: 1,
+    });
+    document.getElementById("mirrorFrame").classList.add("lit");
+    await useImage("./demo.jpg");
+  } catch (err) {
+    say(`the mirror couldn’t load FaceMesh<br><span style="font-size:.78rem">${err.message || err}</span>`);
+    console.error(err);
+  }
+
+  async function useImage(src) {
+    say("finding your face…");
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = src; });
+    // fit into the 4:5 mirror, cover
+    const W = stage.width, H = stage.height;
+    const s = Math.max(W / img.width, H / img.height);
+    const dw = img.width * s, dh = img.height * s;
+    photo = document.createElement("canvas");
+    photo.width = W; photo.height = H;
+    photo.getContext("2d").drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    const result = landmarker.detect(photo);
+    if (!result.faceLandmarks.length) {
+      photo = null;
+      say("no face found in that photo —<br>try a clearer, front-facing portrait");
+      return;
+    }
+    pts = result.faceLandmarks[0].map(p => [p.x * W, p.y * H]);
+    iod = Math.hypot(pts[263][0] - pts[33][0], pts[263][1] - pts[33][1]);
+    hush(); render();
+  }
+
+  function poly(c, idx) {
+    c.beginPath();
+    idx.forEach((i, k) => k ? c.lineTo(pts[i][0], pts[i][1]) : c.moveTo(pts[i][0], pts[i][1]));
+    c.closePath();
+  }
+
+  // Paint one product: draw its shape into an offscreen layer (blurred =
+  // feathered mask), then composite with the "color" blend mode — the canvas
+  // cousin of the Python engine's CIELAB chroma tint.
+  function layer(draw, { blur, color, alpha, mode = "color", extraMultiply = 0 }) {
+    const off = document.createElement("canvas");
+    off.width = stage.width; off.height = stage.height;
+    const c = off.getContext("2d");
+    c.filter = `blur(${blur}px)`;
+    c.fillStyle = color; c.strokeStyle = color;
+    draw(c);
+    ctx.save();
+    ctx.globalAlpha = alpha; ctx.globalCompositeOperation = mode;
+    ctx.drawImage(off, 0, 0);
+    if (extraMultiply > 0) {
+      ctx.globalAlpha = alpha * extraMultiply; ctx.globalCompositeOperation = "multiply";
+      ctx.drawImage(off, 0, 0);
+    }
+    ctx.restore();
+  }
+
+  function lerp(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; }
+
+  function render() {
+    if (!photo) return;
+    ctx.clearRect(0, 0, stage.width, stage.height);
+    ctx.drawImage(photo, 0, 0);
+    if (state.bare || !pts) return;
+
+    // lipstick — outer ring minus mouth opening (evenodd)
+    if (state.lip.i > 0) layer(c => {
+      poly(c, LIPS_OUTER); poly(c, LIPS_INNER); c.fill("evenodd");
+    }, { blur: iod * 0.02, color: state.lip.color, alpha: state.lip.i, extraMultiply: 0.35 });
+
+    // eyeshadow — band between upper lid and 60% toward the brow
+    if (state.shadow.i > 0) layer(c => {
+      [[R_UPPER, R_BROW], [L_UPPER, L_BROW]].forEach(([lid, brow]) => {
+        const upper = lid.map((idx, k) => {
+          const t = k / (lid.length - 1);
+          const bi = Math.min(brow.length - 1, Math.floor(t * (brow.length - 1)));
+          return lerp(pts[idx], pts[brow[bi]], 0.6);
+        });
+        c.beginPath();
+        lid.forEach((i, k) => k ? c.lineTo(pts[i][0], pts[i][1]) : c.moveTo(pts[i][0], pts[i][1]));
+        upper.reverse().forEach(p => c.lineTo(p[0], p[1]));
+        c.closePath(); c.fill();
+      });
+    }, { blur: iod * 0.045, color: state.shadow.color, alpha: state.shadow.i, extraMultiply: 0.2 });
+
+    // eyeliner — stroke along the lash line with a lifted wing
+    if (state.liner.i > 0) layer(c => {
+      c.lineWidth = Math.max(1.5, iod * 0.012); c.lineCap = "round"; c.lineJoin = "round";
+      [R_UPPER, L_UPPER].forEach(arc => {
+        c.beginPath();
+        arc.forEach((i, k) => k ? c.lineTo(pts[i][0], pts[i][1]) : c.moveTo(pts[i][0], pts[i][1]));
+        const a = pts[arc[arc.length - 1]], b = pts[arc[arc.length - 2]];
+        let dx = a[0] - b[0], dy = a[1] - b[1];
+        const n = Math.hypot(dx, dy) || 1;
+        dx = dx / n; dy = dy / n - 0.45;
+        const n2 = Math.hypot(dx, dy);
+        c.lineTo(a[0] + (dx / n2) * iod * 0.06, a[1] + (dy / n2) * iod * 0.06);
+        c.stroke();
+      });
+    }, { blur: Math.max(0.6, iod * 0.004), color: state.liner.color, alpha: state.liner.i, mode: "source-over" });
+
+    // blush — radial pools on the cheeks, clipped to the face oval
+    if (state.blush.i > 0) layer(c => {
+      poly(c, FACE_OVAL); c.clip();
+      [R_CHEEK, L_CHEEK].forEach(i => {
+        const [x, y] = pts[i], r = iod * 0.28;
+        const g = c.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, state.blush.color);
+        g.addColorStop(1, "transparent");
+        c.fillStyle = g;
+        c.fillRect(x - r, y - r, 2 * r, 2 * r);
+      });
+    }, { blur: iod * 0.02, color: state.blush.color, alpha: state.blush.i, extraMultiply: 0.15 });
+  }
+
+  // controls
+  document.getElementById("uploadBtn").addEventListener("click", () => document.getElementById("fileInput").click());
+  document.getElementById("fileInput").addEventListener("change", e => {
+    const f = e.target.files[0];
+    if (f) useImage(URL.createObjectURL(f));
+  });
+  document.getElementById("demoBtn").addEventListener("click", () => useImage("./demo.jpg"));
+  const bareBtn = document.getElementById("bareBtn");
+  const setBare = v => { state.bare = v; bareBtn.setAttribute("aria-pressed", String(v)); render(); };
+  bareBtn.addEventListener("pointerdown", () => setBare(true));
+  ["pointerup", "pointerleave"].forEach(ev => bareBtn.addEventListener(ev, () => setBare(false)));
+  bareBtn.addEventListener("keydown", e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); setBare(true); } });
+  bareBtn.addEventListener("keyup", () => setBare(false));
+
+  // vanity bulbs around the mirror
+  const frame = document.getElementById("mirrorFrame");
+  for (let k = 0; k < 11; k++) {
+    const t = k / 10;                     // arc across the top
+    const ang = Math.PI * (1 + t);       // 180° → 360°
+    const b = document.createElement("span");
+    b.className = "bulb";
+    b.style.left = `calc(50% + ${Math.cos(ang) * 46}% - 6px)`;
+    b.style.top = `calc(42% + ${Math.sin(ang) * 40}% - 6px)`;
+    frame.appendChild(b);
+  }
+})();
+</script>
+</body>
+</html>
