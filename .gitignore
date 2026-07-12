@@ -19,3 +19,6 @@ data/
 
 # OS
 .DS_Store
+
+# Local try-on photos (never committed — celebrity/personal images)
+assets/
