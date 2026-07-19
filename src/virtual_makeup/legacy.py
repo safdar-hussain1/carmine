@@ -1,8 +1,9 @@
-"""Bug-for-bug reproduction of the 2024 course project pipelines.
+"""Naive baseline implementations used by the benchmark.
 
-This module exists so the benchmark can run the original methods against
-the rewrite on identical inputs. Nothing here is fixed on purpose. The
-reproduced defects, verified against the original notebooks:
+These are the classic ways landmark-based AR makeup goes wrong,
+implemented faithfully so ``scripts/benchmark.py`` can score the engine
+against them on identical inputs. Nothing here is fixed on purpose. The
+deliberate defects:
 
 1. ``legacy_mediapipe``: detects MediaPipe's 468-point face mesh but then
    indexes it with **dlib's 68-point region numbers** (lips = 48:60,
@@ -14,20 +15,20 @@ reproduced defects, verified against the original notebooks:
    opaque polygon covering the whole mouth (teeth included), eyeshadow
    uses fixed ±10/±20 *pixel* offsets that only fit one image size, and
    effects are composited with additive ``cv2.addWeighted`` which blows
-   out brightness. The interactive notebook additionally saved results
+   out brightness. Pass ``channel_swap_bug=True`` to additionally save
    through ``cv2.cvtColor(image, cv2.COLOR_RGB2BGR)`` on an already-BGR
-   image, swapping red and blue across the entire photo (the "blue face"
-   outputs); pass ``channel_swap_bug=True`` to reproduce that.
+   image — the classic mixup that swaps red and blue across the entire
+   photo ("blue face" outputs).
 
 3. ``legacy_gan``: an **untrained** 3-layer conv net (random weights, no
-   training loop anywhere in the notebook) run in inference. Outputs are
-   noise by construction; the notebook still reported SSIM and
-   accuracy/precision/recall for it.
+   training loop) run in inference — what "GAN-based makeup" becomes
+   when the training step is skipped. Outputs are noise by construction.
 
-4. ``legacy_metrics``: the notebook's evaluation, in which ``y_true`` is
-   all ones — so "precision" is 1.0 by definition and "accuracy" merely
-   counts SSIM scores above an arbitrary 0.45 threshold. Reproduced so
-   the benchmark can show *why* the original numbers were meaningless.
+4. ``legacy_metrics``: a broken evaluation protocol seen in the wild, in
+   which ``y_true`` is all ones — so "precision" is 1.0 by definition
+   and "accuracy" merely counts SSIM scores above an arbitrary 0.45
+   threshold. Implemented so the benchmark can show *why* such numbers
+   are meaningless.
 """
 
 from __future__ import annotations
@@ -39,8 +40,8 @@ import numpy as np
 # --- 1. MediaPipe pipeline with dlib indices (the purple-triangles bug) ---
 
 def legacy_mediapipe(image_bgr: np.ndarray, mesh_landmarks: np.ndarray) -> np.ndarray:
-    """``apply_virtual_makeup`` from FinalModelWithDataset.ipynb, verbatim
-    logic: dlib region indices applied to 468 FaceMesh points."""
+    """The mismatched-indices baseline: dlib region indices applied
+    verbatim to 468 FaceMesh points."""
     landmarks = [tuple(np.round(p).astype(int)) for p in mesh_landmarks]
     lips = landmarks[48:60]
     eyes = landmarks[36:48]
@@ -67,8 +68,8 @@ def legacy_dlib(
     landmarks68: np.ndarray,
     channel_swap_bug: bool = False,
 ) -> np.ndarray:
-    """The VirtualMakeup.ipynb interactive pipeline with its default
-    slider colors (lips RGB 125,0,105; eyes/blush RGB 128,0,128)."""
+    """The opaque-fill baseline (default colors: lips RGB 125,0,105;
+    eyes/blush RGB 128,0,128)."""
     pts = np.round(landmarks68).astype(int)
     out = image_bgr.copy()
 
@@ -111,7 +112,7 @@ def legacy_dlib(
     out = cv2.addWeighted(out, 1, blush_mask, 0.5, 0)
 
     if channel_swap_bug:
-        # save_final_image() ran RGB2BGR on an image that was already BGR.
+        # RGB2BGR applied to an image that is already BGR: channels swap.
         out = cv2.cvtColor(out, cv2.COLOR_RGB2BGR)
     return out
 
@@ -119,13 +120,10 @@ def legacy_dlib(
 # --- 3. The "GAN": an untrained conv net run in inference ---
 
 def legacy_gan(image_bgr: np.ndarray, rng: np.random.Generator | None = None) -> np.ndarray:
-    """Numpy equivalent of the notebook's untrained Keras generator:
-    Conv(64, relu) -> Conv(64, relu) -> Conv(3, tanh), Glorot-uniform
-    random weights, never trained, output scaled by 255.
-
-    The exact original output is irreproducible by construction (random
-    weights, no seed saved), which is itself the finding; a seeded rng
-    here makes *this* reproduction deterministic.
+    """An untrained generator, in plain numpy: Conv(64, relu) ->
+    Conv(64, relu) -> Conv(3, tanh), Glorot-uniform random weights,
+    never trained, output scaled by 255. A seeded rng keeps the baseline
+    deterministic.
     """
     rng = rng or np.random.default_rng(0)
     x = cv2.resize(image_bgr, (256, 256)).astype(np.float32) / 255.0
@@ -154,13 +152,13 @@ def legacy_gan(image_bgr: np.ndarray, rng: np.random.Generator | None = None) ->
     x = np.maximum(conv(x, w1, b1), 0)
     x = np.maximum(conv(x, w2, b2), 0)
     x = np.tanh(conv(x, w3, b3))
-    return (x * 255).astype(np.uint8)  # tanh in [-1,1]: negatives wrap, as in the original
+    return (x * 255).astype(np.uint8)  # tanh in [-1,1]: negatives wrap on the uint8 cast
 
 
-# --- 4. The notebook's evaluation protocol ---
+# --- 4. The broken evaluation protocol ---
 
 def legacy_metrics(ssim_scores: list[float], threshold: float = 0.45) -> dict[str, float]:
-    """Reproduces calculate_metrics_with_threshold: y_true is all ones,
+    """The all-ones-y_true protocol: y_true is all ones,
     y_pred thresholds SSIM. With a single true class, precision is 1.0
     whenever anything is predicted positive, and accuracy == recall ==
     fraction above threshold. No negative class ever exists."""
@@ -170,7 +168,7 @@ def legacy_metrics(ssim_scores: list[float], threshold: float = 0.45) -> dict[st
         raise ValueError("no scores")
     tp = int(y_pred.sum())
     accuracy = tp / n
-    precision = 1.0  # zero_division=1 in the original masks the empty case
+    precision = 1.0  # a zero_division=1 default masks the empty case
     recall = accuracy
     f1 = 0.0 if tp == 0 else 2 * precision * recall / (precision + recall)
     return {"Accuracy": accuracy, "Precision": precision, "Recall": recall, "F1-Score": f1}

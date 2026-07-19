@@ -1,4 +1,4 @@
-"""Benchmark: 2024 legacy pipelines vs the rewrite, on real photos.
+"""Benchmark: the engine vs four naive baselines, on real photos.
 
 Runs every method on the no-makeup half of the paired makeup dataset and
 scores them on four honest, per-image metrics:
@@ -16,17 +16,16 @@ scores them on four honest, per-image metrics:
 * identity SSIM — grayscale SSIM of output vs input; makeup should
                   restyle, not replace, the photo.
 
-It also re-runs the original notebook's own evaluation protocol (SSIM
-against the with-makeup reference photos + threshold "accuracy") to
-verify the 2024 report's numbers and demonstrate why they were
-meaningless.
+It also runs the popular-but-broken "reference SSIM" protocol (grayscale
+SSIM against with-makeup reference photos + a threshold "accuracy") to
+demonstrate why that metric cannot be trusted for makeup.
 
 Usage:
     python scripts/benchmark.py --dataset DIR --shape-predictor FILE.dat \
         [--out reports]
 
 The dataset directory must contain no_makeup/ and with_makeup/ folders
-(the paired makeup dataset the 2024 course project used). Neither the
+(a paired makeup dataset). Neither the
 dataset nor the dlib model is committed to this repo.
 """
 
@@ -111,7 +110,7 @@ def detect_dlib68(detector, predictor, image: np.ndarray) -> np.ndarray | None:
 
 def original_protocol(outputs: dict[str, dict[str, np.ndarray]],
                       reference_dir: Path) -> dict:
-    """The 2024 notebook's evaluation, reproduced verbatim: grayscale
+    """The rejected evaluation protocol, implemented verbatim: grayscale
     SSIM of each output against the *with-makeup reference photo*, then
     'accuracy/precision/recall' from an all-ones y_true."""
     results = {}

@@ -43,11 +43,11 @@ SERIES = {  # fixed categorical slot per method, never re-ranked
     "new_classic": "#4a3aa7",
 }
 LABELS = {
-    "legacy_mediapipe": "2024 MediaPipe",
-    "legacy_dlib": "2024 dlib",
-    "legacy_dlib_swap": "2024 dlib (saved)",
-    "legacy_gan": "2024 “GAN”",
-    "new_classic": "rewrite",
+    "legacy_mediapipe": "Mismatched indices",
+    "legacy_dlib": "Opaque fill",
+    "legacy_dlib_swap": "Channel swap",
+    "legacy_gan": "Untrained GAN",
+    "new_classic": "This engine",
 }
 
 plt.rcParams.update({
@@ -92,7 +92,7 @@ def fig_benchmark(summary) -> None:
           "Lip texture preserved (lightness corr.)", limit=(-0.3, 1.1))
     _bars(axes[1, 1], summary, "identity_ssim",
           "Identity SSIM vs input")
-    fig.suptitle("2024 pipelines vs rewrite — 25 photos, paired makeup dataset",
+    fig.suptitle("Engine vs naive baselines — 25 photos, paired makeup dataset",
                  fontsize=11, fontweight="bold", x=0.02, ha="left")
     fig.tight_layout(rect=(0, 0, 1, 0.95))
     fig.savefig(FIGDIR / "benchmark_metrics.png")
@@ -119,8 +119,7 @@ def fig_original_protocol(protocol) -> None:
         ax.text(v + 0.01, yi, f"{v:.3f}", va="center", fontsize=8.5,
                 color=SECONDARY)
     ax.set_title(
-        "The 2024 metric can’t tell them apart — grayscale SSIM vs "
-        "reference photo",
+        "Why we don’t score with reference SSIM — it can’t tell them apart",
         fontsize=10, loc="left", color=INK, fontweight="bold")
     fig.tight_layout()
     fig.savefig(FIGDIR / "original_protocol.png")
@@ -163,8 +162,8 @@ def demo_figures(landmarker) -> np.ndarray:
     ]
     _label_strip(
         strip,
-        ["original", "2024 MediaPipe", "2024 dlib (saved)", "2024 “GAN”",
-         "rewrite (classic)"],
+        ["original", "mismatched indices", "channel swap", "untrained GAN",
+         "this engine (classic)"],
         FIGDIR / "legacy_vs_new.png",
     )
 

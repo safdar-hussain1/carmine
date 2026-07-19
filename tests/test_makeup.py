@@ -59,9 +59,9 @@ class TestApplication:
     ):
         """Makeup must be contained: the background stays bit-identical.
 
-        The 2024 additive addWeighted compositing brightened blurred
-        mask halos well outside the face; the channel-swap bug recolored
-        the entire image.
+        Naive additive addWeighted compositing brightens blurred mask
+        halos well outside the face; a channel swap recolors the entire
+        image.
         """
         h, w = astronaut_bgr.shape[:2]
         face = np.zeros((h, w), dtype=np.uint8)
@@ -77,7 +77,7 @@ class TestApplication:
         self, astronaut_bgr, astronaut_landmarks, classic_result
     ):
         """Lightness detail inside the lips must correlate strongly with
-        the original — flat fills (the old approach) drop this to ~0."""
+        the input — naive flat fills drop this to ~0."""
         m = masks.lip_mask(astronaut_landmarks, astronaut_bgr.shape[:2]) > 0.5
         before = cv2.cvtColor(astronaut_bgr, cv2.COLOR_BGR2Lab)[..., 0][m].astype(float)
         after = cv2.cvtColor(classic_result, cv2.COLOR_BGR2Lab)[..., 0][m].astype(float)

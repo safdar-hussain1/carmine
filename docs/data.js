@@ -1,10 +1,10 @@
 const BENCH = {
  "labels": {
-  "legacy_mediapipe": "2024 MediaPipe",
-  "legacy_dlib": "2024 dlib",
-  "legacy_dlib_swap": "2024 dlib (saved)",
-  "legacy_gan": "2024 \u201cGAN\u201d",
-  "new_classic": "rewrite"
+  "legacy_mediapipe": "Mismatched indices",
+  "legacy_dlib": "Opaque fill",
+  "legacy_dlib_swap": "Channel swap",
+  "legacy_gan": "Untrained GAN",
+  "new_classic": "This engine"
  },
  "summary": {
   "legacy_mediapipe": {

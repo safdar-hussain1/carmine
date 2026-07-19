@@ -3,9 +3,9 @@
 Every mask is a float32 array in [0, 1] with the image's height/width.
 All sizes (feather radii, liner thickness, blush axes) are expressed as
 fractions of the interocular distance, so the same look renders
-identically on a 400 px selfie and a 4000 px portrait — the original
-2024 project used fixed pixel offsets and broke on anything but the one
-test image.
+identically on a 400 px selfie and a 4000 px portrait — fixed pixel
+offsets (the naive approach, kept as a baseline in ``legacy.py``) only
+ever fit one image size.
 """
 
 from __future__ import annotations
@@ -34,8 +34,8 @@ def lip_mask(landmarks: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
     """Lip region: outer contour minus the mouth opening.
 
     The subtraction is what keeps lipstick off teeth when the mouth is
-    open — the original project filled landmarks 48-68 as one polygon
-    and painted the whole mouth interior.
+    open — a single filled polygon (the naive approach) paints the whole
+    mouth interior.
     """
     iod = interocular_distance(landmarks)
     outer = _polygon(shape, landmarks[regions.LIPS_OUTER])

@@ -35,7 +35,7 @@ def test_lip_mask_covers_lips_not_mouth_interior(astronaut_landmarks, shape):
     x, y = np.round(lip_pt).astype(int)
     assert m[y, x] > 0.5
     # Mouth interior: centroid of the inner ring must stay clean —
-    # this is the teeth-painting bug of the 2024 project.
+    # painting the mouth interior is the classic naive-fill mistake.
     interior = astronaut_landmarks[regions.LIPS_INNER].mean(axis=0)
     x, y = np.round(interior).astype(int)
     assert m[y, x] < 0.25
@@ -62,8 +62,8 @@ def test_eyeshadow_stays_out_of_the_eye(astronaut_landmarks, shape):
 def test_masks_scale_with_image_size(astronaut_bgr, landmarker):
     """Same face at 2x resolution -> mask area ~4x (scale invariance).
 
-    The 2024 project used fixed pixel offsets (eyeshadow) and fixed
-    radii (blush circles of r=20), which do not scale.
+    Naive filters use fixed pixel offsets (eyeshadow) and fixed radii
+    (blush circles of r=20), which do not scale.
     """
     big = cv2.resize(astronaut_bgr, None, fx=2.0, fy=2.0)
     lm_small = landmarker.detect(astronaut_bgr)

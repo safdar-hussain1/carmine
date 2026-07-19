@@ -1,4 +1,4 @@
-"""Builds notebooks/01_audit_and_rewrite.ipynb (execute with nbconvert)."""
+"""Builds notebooks/01_engine_and_baselines.ipynb (execute with nbconvert)."""
 
 import nbformat as nbf
 from pathlib import Path
@@ -10,35 +10,30 @@ code = nbf.v4.new_code_cell
 cells = []
 
 cells.append(md("""\
-# Virtual Makeup — audit of the 2024 project and the rewrite
+# Virtual Makeup Studio — engineering notes
 
-In 2024 I built a "virtual makeup" course project (Digital Image Processing,
-semester 5): detect facial landmarks, then paint lipstick, eyeshadow and blush
-onto a photo. The outputs were bad, and the reported metrics looked fine anyway.
-This notebook documents **what was actually wrong**, verifies every original
-claim by re-running the old logic, and walks through the rewrite.
+This notebook walks through how the makeup engine works, the naive baselines it
+is benchmarked against, and why the evaluation metrics were chosen the way they
+were.
 
-**The five findings, up front:**
+**The engine in one paragraph:** detect MediaPipe's 468-point face mesh, build
+soft region masks whose every dimension is a fraction of the interocular
+distance (so looks scale with the face), and apply pigment in CIELAB — chroma
+moves toward the target shade while lightness keeps the original skin detail.
+Lipstick's mask is the outer lip contour *minus the mouth opening*, so teeth
+stay clean even mid-smile.
 
-1. **Wrong landmark topology.** The "MediaPipe" pipeline detected MediaPipe's
-   468-point face mesh but indexed it with **dlib's 68-point region numbers**
-   (`lips = landmarks[48:60]`). On the 468-point mesh those indices are
-   scattered around the chin and jaw — the "lipstick" was a purple polygon
-   across the lower face.
-2. **A channel-swap save bug.** The interactive notebook saved results through
-   `cv2.cvtColor(image, cv2.COLOR_RGB2BGR)` on an image that was **already
-   BGR**, swapping red and blue across the whole photo. Every saved dlib
-   output had a blue face.
-3. **The "GAN" was never trained.** The third method built a 3-layer conv net
-   with random weights and ran `predict` — there is no training loop anywhere
-   in the notebook. Its outputs are noise by construction.
-4. **Destructive rendering.** Lipstick was an opaque `fillPoly` over the whole
-   mouth (teeth included); eyeshadow used fixed ±10/±20 **pixel** offsets that
-   only fit one image size; everything was composited with additive
-   `cv2.addWeighted`, which blows out brightness.
-5. **Meaningless evaluation.** The reported "accuracy 0.88 / precision 1.0"
-   came from a protocol where `y_true` is **all ones** — precision is 1.0 for
-   any output whatsoever, including the untrained GAN's noise.
+**Why baselines?** Rendering quality claims are easy to fake. So the repo keeps
+four deliberately broken implementations (`virtual_makeup.legacy`) — the
+classic ways landmark-based AR makeup goes wrong — and scores the engine
+against them on 25 real portraits:
+
+1. **Mismatched indices** — dlib's 68-point region numbers applied to the
+   468-point mesh: pigment lands on the chin, not the lips.
+2. **Opaque fill** — one hard polygon over the whole mouth, fixed-pixel
+   eyeshadow offsets, additive compositing.
+3. **Channel swap** — `RGB2BGR` applied to an already-BGR image at save time.
+4. **Untrained GAN** — a random-weight conv net run in inference.
 """))
 
 cells.append(code("""\
@@ -69,54 +64,48 @@ mesh = landmarker.detect(astro)
 print(f"{len(mesh)} mesh landmarks detected")"""))
 
 cells.append(md("""\
-## 1. Reproducing the bugs
-
-`virtual_makeup.legacy` reimplements the 2024 pipelines bug-for-bug (verified
-line-by-line against the original notebooks). Here is each one on the same
-portrait:
+## 1. The engine vs the baselines, on one portrait
 """))
 
 cells.append(code("""\
-legacy_mp = legacy.legacy_mediapipe(astro, mesh)
+baseline_mp = legacy.legacy_mediapipe(astro, mesh)
 gan = cv2.resize(legacy.legacy_gan(astro), astro.shape[1::-1])
-rewrite = apply_makeup(astro, PRESETS["classic"], landmarks=mesh)
+engine = apply_makeup(astro, PRESETS["classic"], landmarks=mesh)
 show(
-    [astro, legacy_mp, gan, rewrite],
-    ["original", "2024 MediaPipe:\\ndlib indices on a 468-pt mesh",
-     "2024 \\u201cGAN\\u201d (untrained)", "rewrite (classic preset)"],
+    [astro, baseline_mp, gan, engine],
+    ["original", "mismatched indices:\\ndlib numbers on a 468-pt mesh",
+     "untrained GAN", "this engine (classic preset)"],
 )"""))
 
 cells.append(md("""\
-The purple blob near the eye is the old code's "lipstick": dlib's lip indices
-48–59 point at completely different anatomy on MediaPipe's mesh. The "GAN"
-panel is what an untrained network outputs — and the 2024 report still
-computed accuracy metrics for it.
+The purple blob near the eye is what mismatched landmark indices produce:
+dlib's lip indices 48–59 point at completely different anatomy on MediaPipe's
+mesh. Nothing crashes — the pigment just lands on the wrong polygon, which is
+why the engine's region sets live in one module (`regions.py`) and are pinned
+by tests.
 
-## 2. Why the outputs were blue
+## 2. The channel-swap trap
 
-Every saved output of the dlib pipeline ran `cv2.cvtColor(img,
-cv2.COLOR_RGB2BGR)` before `imwrite` — but OpenCV images are already BGR, so
-this swaps red and blue instead of converting anything:
+OpenCV images are BGR. Passing one through `cv2.COLOR_RGB2BGR` "conversion"
+before saving doesn't convert anything — it swaps red and blue across the
+whole photo. The benchmark keeps this as a baseline because a color-blind
+metric (see §5) barely notices it:
 """))
 
 cells.append(code("""\
-lips_before = astro.copy()
-swapped = cv2.cvtColor(astro, cv2.COLOR_RGB2BGR)  # the 2024 save path
-show([lips_before, swapped], ["as processed (BGR)", "as saved by the 2024 code"])"""))
+swapped = cv2.cvtColor(astro, cv2.COLOR_RGB2BGR)
+show([astro, swapped], ["correct (BGR handled as BGR)", "after the RGB2BGR mixup"])"""))
 
 cells.append(md("""\
-## 3. The rewrite
+## 3. How the engine places and applies color
 
-Same idea, built correctly:
-
-* **Correct topology** — canonical FaceMesh index sets for lips (outer *minus
-  inner* ring, so open mouths keep their teeth), eyelids, brows, cheeks.
-* **Face-scaled geometry** — every feather radius, liner thickness and blush
-  axis is a fraction of the interocular distance, so the look survives any
-  image resolution.
-* **Texture-preserving color** — pigment is applied in CIELAB: chroma moves
-  toward the target color, lightness keeps most of the original detail.
-  Highlights, pores and lip creases survive.
+* **Geometry** — canonical FaceMesh index sets for lips (outer *minus inner*
+  ring), eyelids, brows, cheeks and the face oval.
+* **Placement** — every feather radius, liner thickness and blush axis is a
+  fraction of the interocular distance, so the same look survives any image
+  resolution (a test doubles the photo and asserts mask areas scale ~4×).
+* **Pigment** — CIELAB tinting: chroma moves toward the shade, lightness keeps
+  most of the original detail, so pores and lip creases survive.
 """))
 
 cells.append(code("""\
@@ -126,7 +115,7 @@ for color, fn in [((60, 60, 220), masks.lip_mask), ((200, 120, 60), masks.eyesha
                   ((60, 200, 60), masks.eyeliner_mask), ((180, 60, 180), masks.blush_mask)]:
     m = fn(mesh, shape)[..., None]
     overlay = overlay * (1 - 0.85 * m) + np.array(color) * 0.85 * m
-show([astro, overlay.astype(np.uint8), rewrite],
+show([astro, overlay.astype(np.uint8), engine],
      ["input", "soft, face-scaled masks", "result"])"""))
 
 cells.append(code("""\
@@ -137,8 +126,8 @@ show([astro] + [apply_makeup(astro, lk, landmarks=mesh) for _, lk in looks],
 cells.append(md("""\
 ## 4. Benchmark — every method, 25 real photos
 
-`scripts/benchmark.py` runs all four 2024 variants and the rewrite on the
-no-makeup half of the paired dataset the course project used, scoring:
+`scripts/benchmark.py` runs the engine and all four baselines on the no-makeup
+half of a paired makeup dataset, scoring:
 
 * **containment** — share of edit energy inside legitimate makeup regions
 * **background integrity** — background pixels left bit-identical
@@ -149,12 +138,15 @@ no-makeup half of the paired dataset the course project used, scoring:
 cells.append(code("""\
 bench = json.loads((Path.cwd().parent / "reports" / "benchmark.json").read_text())
 summary = bench["summary"]
+NAMES = {"legacy_mediapipe": "mismatched indices", "legacy_dlib": "opaque fill",
+         "legacy_dlib_swap": "channel swap", "legacy_gan": "untrained GAN",
+         "new_classic": "this engine"}
 
 import pandas as pd
 rows = []
 for method, s in summary.items():
     rows.append({
-        "method": method,
+        "method": NAMES[method],
         "containment": round(s["containment"]["mean"], 3),
         "background": round(s["background_integrity"]["mean"], 3),
         "lip texture": round(s["lip_texture_corr"]["mean"], 3),
@@ -164,17 +156,17 @@ for method, s in summary.items():
 pd.DataFrame(rows).set_index("method")"""))
 
 cells.append(md("""\
-The rewrite's containment is 0.82 rather than 1.0 only because the metric is
+The engine's containment is 0.825 rather than 1.0 only because the metric is
 strict: the remaining energy is invisible ±1–2-count ripple in the feathered
-falloff (at any non-zero mask threshold the rewrite's containment is exactly
-1.0 by construction — it cannot write outside its masks; the makeup tests
-verify the background stays bit-identical).
+falloff. At any non-zero mask threshold the engine's containment is exactly
+1.0 by construction — it cannot write outside its masks, and the test suite
+asserts the background stays bit-identical.
 
-## 5. Verifying the original claims
+## 5. Why the metrics look like this (and not "SSIM vs a reference")
 
-The 2024 report said: SSIM (MediaPipe) = 0.515, SSIM (dlib) = 0.518,
-SSIM (GAN) = 0.043, and "accuracy 0.88, precision 1.0". Re-running the same
-protocol today:
+A tempting way to score makeup transfer is grayscale SSIM against a reference
+with-makeup photo, plus a threshold "accuracy". Running that protocol on every
+method shows why it was rejected:
 """))
 
 cells.append(code("""\
@@ -183,7 +175,7 @@ rows = []
 for method, p in protocol.items():
     m = p["legacy_metrics@0.45"]
     rows.append({
-        "method": method,
+        "method": NAMES[method],
         "SSIM vs reference": round(p["mean_ssim_vs_reference"], 3),
         "\\u201caccuracy\\u201d": round(m["Accuracy"], 3),
         "\\u201cprecision\\u201d": m["Precision"],
@@ -191,32 +183,31 @@ for method, p in protocol.items():
 pd.DataFrame(rows).set_index("method")"""))
 
 cells.append(md("""\
-Three things this table proves:
+Two failure modes, both fatal:
 
-1. **The old numbers replicate approximately** (dlib 0.53 vs the reported
-   0.518; MediaPipe 0.52 vs 0.515), so the audit is faithful. The GAN number
-   cannot replicate exactly — the weights were random and unseeded, which is
-   itself the finding.
-2. **The metric cannot distinguish working code from broken code.** The
-   blue-face channel-swap output scores 0.527 — statistically identical to the
-   best method — because grayscale SSIM is blind to color, and makeup *is*
+1. **The metric cannot distinguish working code from broken code.** The
+   channel-swapped blue face scores 0.527 — statistically identical to the
+   engine's 0.531 — because grayscale SSIM is blind to color, and makeup *is*
    color.
-3. **"Precision = 1.0" is an artifact.** `y_true` is all ones, so precision is
-   1.0 for every method including untrained noise. The 2024 headline metrics
-   were unfalsifiable.
+2. **"Precision = 1.0" is an artifact.** With `y_true` all ones, precision is
+   1.0 for every method, including untrained noise. A metric that a known-broken
+   baseline can pass measures nothing.
+
+That is why the benchmark scores *where the pigment landed* and *what survived*
+instead — metrics the baselines demonstrably fail.
 
 ## 6. Takeaways
 
-* Validate landmark topology at the boundary — an index set is a contract,
-  and mixing two topologies fails silently and visibly at once.
-* Never claim a metric a broken baseline can pass; a metric that gives
-  noise a score of "precision 1.0" measures nothing.
-* Makeup rendering is a color-space problem: recolor chroma in CIELAB and
-  leave lightness mostly alone, and skin stops looking like paint.
+* Landmark index sets are a contract with a specific topology; mixing two
+  topologies fails silently and visibly at once. Pin them with tests.
+* Never ship a metric a broken baseline can pass — keep the broken baselines
+  around and check.
+* Makeup rendering is a color-space problem: recolor chroma in CIELAB, leave
+  lightness mostly alone, and skin stops looking like paint.
 """))
 
 nb["cells"] = cells
 nb["metadata"]["kernelspec"] = {"name": "python3", "display_name": "Python 3", "language": "python"}
-out = Path(__file__).resolve().parents[1] / "notebooks" / "01_audit_and_rewrite.ipynb"
+out = Path(__file__).resolve().parents[1] / "notebooks" / "01_engine_and_baselines.ipynb"
 nbf.write(nb, out)
 print(f"wrote {out}")

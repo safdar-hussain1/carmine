@@ -1,4 +1,4 @@
-"""Tests that pin down the 2024 bugs the legacy module reproduces."""
+"""Tests that pin down the defects each naive baseline must exhibit."""
 
 import numpy as np
 import pytest
@@ -40,14 +40,13 @@ def test_legacy_gan_output_is_noise(astronaut_bgr):
         cv2.cvtColor(out, cv2.COLOR_BGR2GRAY),
     )
     # A faithful makeup application scores ~0.9+ SSIM against its own
-    # input; the untrained net destroys most structure. (The notebook's
-    # 0.043 was measured against *different* reference photos.)
+    # input; the untrained net destroys most structure.
     assert score < 0.5
 
 
 def test_legacy_metrics_precision_is_always_one():
     """With y_true all ones, 'precision' is 1.0 no matter the scores —
-    the original notebook's headline metric was unfalsifiable."""
+    the protocol's headline metric is unfalsifiable."""
     for scores in ([0.9, 0.8], [0.01, 0.02], [0.5, 0.1, 0.99]):
         assert legacy.legacy_metrics(scores)["Precision"] == 1.0
 

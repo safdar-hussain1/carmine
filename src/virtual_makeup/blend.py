@@ -1,9 +1,10 @@
 """Color blending that recolors skin without destroying its texture.
 
-The original 2024 project used ``cv2.addWeighted(image, 1, mask, 0.6, 0)``
-— an *additive* overlay that blows out brightness and shifts every channel
-— or hard pixel assignment (``image[mask] = color``), which erases pores,
-highlights and shading entirely.
+Naive filters use ``cv2.addWeighted(image, 1, mask, 0.6, 0)`` — an
+*additive* overlay that blows out brightness and shifts every channel —
+or hard pixel assignment (``image[mask] = color``), which erases pores,
+highlights and shading entirely (both are kept as measurable baselines
+in ``legacy.py``).
 
 Here makeup is applied in CIELAB: the a/b (chroma) channels are pulled
 toward the target color while L (lightness) keeps most of the original
