@@ -726,10 +726,15 @@
   }
 
   /* painting */
-  function poly(c, idx) {
-    c.beginPath();
+  // Adds one closed contour to the CURRENT path (no beginPath), so several
+  // rings can share a path — that is what makes an even-odd donut possible.
+  function trace(c, idx) {
     idx.forEach((i, k) => k ? c.lineTo(pts[i][0], pts[i][1]) : c.moveTo(pts[i][0], pts[i][1]));
     c.closePath();
+  }
+  function poly(c, idx) {
+    c.beginPath();
+    trace(c, idx);
   }
   function layer(draw, { blur, color, alpha, mode = "color", extraMultiply = 0 }) {
     offctx.save();
@@ -755,8 +760,13 @@
     ctx.drawImage(photo, 0, 0);
     if (state.bare || !pts) return;
 
+    // Outer lip contour minus the mouth opening, as one even-odd path —
+    // both rings must live in the same path or the hole is not cut.
     if (state.lip.i > 0) layer(c => {
-      poly(c, LIPS_OUTER); poly(c, LIPS_INNER); c.fill("evenodd");
+      c.beginPath();
+      trace(c, LIPS_OUTER);
+      trace(c, LIPS_INNER);
+      c.fill("evenodd");
     }, { blur: iod * .02, color: state.lip.color, alpha: state.lip.i, extraMultiply: .35 });
 
     if (state.shadow.i > 0) layer(c => {
