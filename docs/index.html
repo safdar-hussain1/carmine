@@ -658,12 +658,23 @@
     if (!landmarker) return;
     say("asking for your camera…");
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw Object.assign(new Error(), { name: "UnsupportedError" });
+      }
       camStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user", width: { ideal: 960 }, height: { ideal: 1200 } },
         audio: false,
       });
-    } catch {
-      say("camera permission was declined —<br>you can still try a photo instead");
+    } catch (err) {
+      const reasons = {
+        NotAllowedError: "camera access was blocked",
+        NotFoundError: "no camera found on this device",
+        NotReadableError: "the camera is already in use by another app",
+        OverconstrainedError: "no camera matches the requested settings",
+        UnsupportedError: "this browser can’t open a camera here",
+      };
+      const why = reasons[err && err.name] || "the camera couldn’t be opened";
+      say(`${why} —<br><span style="font-size:.8rem">you can still try a photo instead</span>`);
       return;
     }
     video.srcObject = camStream;
