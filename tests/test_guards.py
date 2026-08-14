@@ -8,6 +8,7 @@ Banned strings are assembled from concatenated fragments so this file never
 contains a literal match of what it is guarding against.
 """
 
+import re
 import subprocess
 from pathlib import Path
 
@@ -21,11 +22,26 @@ BINARY_EXTENSIONS = {
 
 SKIP_PATHS = {
     "web/package-lock.json",
-    # .gitignore must itself contain ignore patterns for AI-tool workspace
-    # directories (e.g. a dotfolder named after this vendor); that is
-    # infrastructure, not prose mentioning the vendor, so it is exempt here.
-    ".gitignore",
 }
+
+# A line in .gitignore that is *only* a dot-directory ignore pattern (e.g. a
+# local tool workspace folder) is infrastructure that keeps such folders out
+# of git, not prose mentioning any tool by name. Such lines are exempt from
+# the banned-words scan; everything else in .gitignore (including comments)
+# is still scanned.
+DOT_DIR_IGNORE_PATTERN = re.compile(r"^\.[A-Za-z][^ ]*/$")
+
+
+def _text_for_banned_scan(rel_path, text):
+    if rel_path != ".gitignore":
+        return text
+    kept_lines = [
+        line
+        for line in text.splitlines()
+        if not DOT_DIR_IGNORE_PATTERN.match(line.strip())
+    ]
+    return "\n".join(kept_lines)
+
 
 BANNED_WORDS = [
     "re" + "build",
@@ -79,7 +95,8 @@ def test_private_paths_are_ignored():
 def test_no_banned_words_in_tracked_files():
     violations = []
     for rel_path, text in _iter_tracked_text_files():
-        lowered = text.lower()
+        scanned = _text_for_banned_scan(rel_path, text)
+        lowered = scanned.lower()
         for banned in BANNED_WORDS:
             if banned.lower() in lowered:
                 violations.append((rel_path, banned))
@@ -95,20 +112,65 @@ def test_no_absolute_user_paths():
     assert not violations, f"absolute user paths found in tracked files: {violations}"
 
 
-def test_no_process_docs_tracked():
-    banned_path_fragments = [
-        "spec/",
-        "plans/",
-        "handbook",
-        "session-numbers",
-        "subagent",
-        "session-prompt",
-        ".superpowers",
+PROCESS_DOC_PATH_FRAGMENTS = [
+    "spec/",
+    "plans/",
+    "handbook",
+    "session-numbers",
+    "subagent",
+    "session-prompt",
+    ".superpowers",
+]
+
+# Basename (filename without extension) checks catch process docs dropped at
+# any directory level, e.g. a bare "SPEC.md" or "PLAN.md" at repo root, which
+# the directory-fragment checks above (looking for "spec/", "plans/") cannot
+# see. Underscores are normalized to hyphens so "PROMPT_HISTORY.md" is caught
+# by the same "prompt-history" check as a hyphenated name would be.
+PROCESS_DOC_BASENAME_EXACT = {"spec", "plan", "prompt"}
+PROCESS_DOC_BASENAME_CONTAINS = [
+    "handbook",
+    "session-numbers",
+    "subagent",
+    "session-prompt",
+    "prompt-history",
+]
+PROCESS_DOC_BASENAME_PREFIXES = ("spec-", "plan-")
+
+
+def _is_process_doc_path(rel_path):
+    lowered_path = rel_path.lower()
+    for fragment in PROCESS_DOC_PATH_FRAGMENTS:
+        if fragment in lowered_path:
+            return True
+
+    stem = Path(rel_path).stem.lower().replace("_", "-")
+    if stem in PROCESS_DOC_BASENAME_EXACT:
+        return True
+    for fragment in PROCESS_DOC_BASENAME_CONTAINS:
+        if fragment in stem:
+            return True
+    for prefix in PROCESS_DOC_BASENAME_PREFIXES:
+        if stem.startswith(prefix):
+            return True
+    return False
+
+
+def test_process_doc_matcher_positive_and_negative_examples():
+    must_flag = ["SPEC.md", "PLAN.md", "docs/plans/x.md", "PROMPT_HISTORY.md"]
+    must_not_flag = [
+        "docs/DESIGN_CARD.md",
+        "src/carmine/pigment.py",
+        "tests/test_landmarks.py",
     ]
-    violations = []
-    for rel_path in _git_ls_files():
-        lowered = rel_path.lower()
-        for fragment in banned_path_fragments:
-            if fragment in lowered:
-                violations.append((rel_path, fragment))
+    for path in must_flag:
+        assert _is_process_doc_path(path), f"matcher should flag {path}"
+    for path in must_not_flag:
+        assert not _is_process_doc_path(path), f"matcher should not flag {path}"
+
+
+def test_no_process_docs_tracked():
+    violations = [
+        rel_path for rel_path in _git_ls_files() if _is_process_doc_path(rel_path)
+    ]
     assert not violations, f"process/planning docs tracked: {violations}"
