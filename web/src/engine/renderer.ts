@@ -56,9 +56,31 @@ export interface GlossInputs {
   lipstick?: GlossPercentiles | null;
 }
 
+/** Per-frame draw options that do not change the look itself. */
+export interface RenderOptions {
+  /**
+   * Flip horizontally, so a camera feed reads as a mirror. Done in the
+   * shader rather than with a CSS transform on the canvas, so the pixels a
+   * capture reads back are already the ones the viewer saw.
+   */
+  mirror?: boolean;
+  /**
+   * Before/after split, in drawing-buffer pixels from the left edge. Pixels
+   * left of it are drawn untouched; pixels right of it get the full look.
+   * Null or undefined draws the whole frame with the look.
+   */
+  splitX?: number | null;
+}
+
 export interface Renderer {
   /** Draw one frame. `source` is anything `texImage2D` accepts. */
-  render(source: TexImageSource, masks: MaskSet, look: LookConfig, gloss: GlossInputs): void;
+  render(
+    source: TexImageSource,
+    masks: MaskSet,
+    look: LookConfig,
+    gloss: GlossInputs,
+    options?: RenderOptions,
+  ): void;
   /** Resize the drawing buffer and viewport. */
   resize(width: number, height: number): void;
   /** Release every GL object this renderer owns. */
@@ -124,6 +146,12 @@ uniform vec2 uGlossPercentilesLipstick;
 // Matte: strength plus the mip level standing in for the sigma=5 blur.
 uniform float uMatteLipstick;
 uniform float uMatteLod;
+
+// 1.0 flips the frame horizontally (mirror mode); 1.0 on uBypass writes the
+// source through untouched, which is how the before/after wipe draws its
+// "before" side from the same program in a second scissored pass.
+uniform float uMirror;
+uniform float uBypass;
 
 const float DELTA = 6.0 / 29.0;
 const float DELTA_CUBED = DELTA * DELTA * DELTA;
@@ -199,14 +227,20 @@ float applyGloss(float l, float weight, float strength, vec2 percentiles) {
 }
 
 void main() {
-  vec4 frame = texture(uFrame, vUv);
+  vec2 uv = vec2(mix(vUv.x, 1.0 - vUv.x, uMirror), vUv.y);
+  vec4 frame = texture(uFrame, uv);
 
-  float mBlush = texture(uMaskBlush, vUv).r * uIntensityBlush;
-  float mHighlighter = texture(uMaskHighlighter, vUv).r * uIntensityHighlighter;
-  float mEyeshadow = texture(uMaskEyeshadow, vUv).r * uIntensityEyeshadow;
-  float mBrows = texture(uMaskBrows, vUv).r * uIntensityBrows;
-  float mLipstick = texture(uMaskLipstick, vUv).r * uIntensityLipstick;
-  float mEyeliner = texture(uMaskEyeliner, vUv).r * uIntensityEyeliner;
+  if (uBypass > 0.5) {
+    fragColor = frame;
+    return;
+  }
+
+  float mBlush = texture(uMaskBlush, uv).r * uIntensityBlush;
+  float mHighlighter = texture(uMaskHighlighter, uv).r * uIntensityHighlighter;
+  float mEyeshadow = texture(uMaskEyeshadow, uv).r * uIntensityEyeshadow;
+  float mBrows = texture(uMaskBrows, uv).r * uIntensityBrows;
+  float mLipstick = texture(uMaskLipstick, uv).r * uIntensityLipstick;
+  float mEyeliner = texture(uMaskEyeliner, uv).r * uIntensityEyeliner;
 
   float touched = max(max(max(mBlush, mHighlighter), max(mEyeshadow, mBrows)),
                       max(mLipstick, mEyeliner));
@@ -231,7 +265,7 @@ void main() {
   lab = applyTint(lab, uLabLipstick, mLipstick, uPullLipstick);
   float lipMask = mLipstick / max(uIntensityLipstick, 1e-6);
   if (uMatteLipstick > 0.0) {
-    float blurredL = rgbToLab(textureLod(uFrame, vUv, uMatteLod).rgb).x;
+    float blurredL = rgbToLab(textureLod(uFrame, uv, uMatteLod).rgb).x;
     lab.x += (blurredL - lab.x) * lipMask * uMatteLipstick;
   }
   lab.x = applyGloss(lab.x, lipMask, uGlossLipstick, uGlossPercentilesLipstick);
@@ -421,7 +455,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
   }
 
   return {
-    render(source, masks, look, gloss) {
+    render(source, masks, look, gloss, options) {
       if (disposed) {
         return;
       }
@@ -489,9 +523,35 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
       // A mip level halves resolution per step, so a level of log2(sigma)
       // covers roughly the sigma-pixel neighborhood the CPU blur averages.
       gl.uniform1f(uniform("uMatteLod"), Math.log2(Math.max(MATTE_BLUR_SIGMA, 1)));
+      gl.uniform1f(uniform("uMirror"), options?.mirror ? 1 : 0);
 
+      const bypass = uniform("uBypass");
       gl.bindVertexArray(vao);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+      const splitX = options?.splitX ?? null;
+      const cut = splitX === null ? null : Math.round(Math.min(Math.max(splitX, 0), canvas.width));
+      if (cut === null || cut <= 0 || cut >= canvas.width) {
+        // No wipe, or the handle is parked past an edge: one full-viewport
+        // draw, entirely "after" (handle at the left) or entirely "before"
+        // (handle at the right).
+        gl.uniform1f(bypass, cut !== null && cut >= canvas.width ? 1 : 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+      } else {
+        // Two scissored passes of the same program: the left slice writes
+        // the source through untouched, the right slice gets the look. A
+        // second draw is cheaper here than a second framebuffer, and it
+        // keeps the "before" side pixel-exact with the input.
+        gl.enable(gl.SCISSOR_TEST);
+        gl.scissor(0, 0, cut, canvas.height);
+        gl.uniform1f(bypass, 1);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        gl.scissor(cut, 0, canvas.width - cut, canvas.height);
+        gl.uniform1f(bypass, 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        gl.disable(gl.SCISSOR_TEST);
+      }
+
+      gl.uniform1f(bypass, 0);
       gl.bindVertexArray(null);
     },
 

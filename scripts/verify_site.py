@@ -8,9 +8,12 @@ title on PASS; exits 1 and prints diagnostics otherwise.
 
 Usage:
     python scripts/verify_site.py [--url URL] [--timeout SECONDS]
+                                  [--expect-checks N]
 
-Later tasks add more selftest checks to the same page; this script doesn't
-need to change to pick those up, since it only watches the aggregate title.
+The title carries the aggregate result and the number of checks that ran, so
+adding a check needs no change here -- but `--expect-checks` is enforced by
+default, because a check that silently stops being registered would otherwise
+still report PASS.
 """
 
 from __future__ import annotations
@@ -18,6 +21,7 @@ from __future__ import annotations
 import argparse
 import http.server
 import json
+import re
 import shutil
 import socket
 import subprocess
@@ -30,6 +34,9 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DOCS_DIR = REPO_ROOT / "docs"
+
+# Number of checks web/src/main.ts registers. Bumped whenever one is added.
+EXPECTED_CHECKS = 6
 
 CHROME_CANDIDATES = [
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -154,14 +161,29 @@ def main() -> int:
     parser.add_argument(
         "--timeout",
         type=float,
-        default=60.0,
-        help="Seconds to wait for the selftest title (default: 60)",
+        default=120.0,
+        help="Seconds to wait for the selftest title (default: 120)",
+    )
+    parser.add_argument(
+        "--expect-checks",
+        type=int,
+        default=EXPECTED_CHECKS,
+        help=f"Fail unless exactly this many checks ran (default: {EXPECTED_CHECKS}; 0 disables)",
     )
     args = parser.parse_args()
 
     passed, title = verify(args.url, args.timeout)
     print(title)
-    return 0 if passed else 1
+    if not passed:
+        return 1
+
+    if args.expect_checks:
+        match = re.search(r"n=(\d+)", title)
+        ran = int(match.group(1)) if match else -1
+        if ran != args.expect_checks:
+            print(f"expected {args.expect_checks} checks, {ran} ran")
+            return 1
+    return 0
 
 
 if __name__ == "__main__":
