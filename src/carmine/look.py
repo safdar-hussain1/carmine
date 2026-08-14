@@ -79,6 +79,14 @@ class Look:
                 continue
 
             product = getattr(self, field_obj.name)
+
+            # Check if field is a Product instance
+            if not isinstance(product, Product):
+                errors.append(
+                    f"{field_obj.name} must be a Product, got {type(product).__name__}"
+                )
+                continue
+
             errors.extend(self._validate_product(field_obj.name, product))
 
         if errors:

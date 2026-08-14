@@ -61,44 +61,60 @@ class TestLookValidation:
         """Invalid hex color in any product raises ValueError."""
         with pytest.raises(ValueError) as exc_info:
             Look(lipstick=Product("not-a-color"))
-        assert "invalid hex color" in str(exc_info.value).lower() or "color" in str(exc_info.value).lower()
+        assert "invalid hex color" in str(exc_info.value).lower()
 
     def test_intensity_out_of_range_raises_valueerror(self):
         """Intensity outside [0, 1] raises ValueError."""
         with pytest.raises(ValueError) as exc_info:
             Look(lipstick=Product("#FF0000", intensity=1.5))
-        assert "intensity" in str(exc_info.value).lower() or "0" in str(exc_info.value)
+        error_msg = str(exc_info.value)
+        assert "lipstick" in error_msg.lower()
+        assert "intensity" in error_msg.lower()
+        assert "1.5" in error_msg
 
     def test_negative_intensity_raises_valueerror(self):
         """Negative intensity raises ValueError."""
         with pytest.raises(ValueError) as exc_info:
             Look(lipstick=Product("#FF0000", intensity=-0.1))
-        assert "intensity" in str(exc_info.value).lower() or "0" in str(exc_info.value)
+        error_msg = str(exc_info.value)
+        assert "lipstick" in error_msg.lower()
+        assert "intensity" in error_msg.lower()
+        assert "-0.1" in error_msg
 
     def test_smoothing_out_of_range_raises_valueerror(self):
         """Smoothing outside [0, 1] raises ValueError."""
         with pytest.raises(ValueError) as exc_info:
             Look(smoothing=1.5)
-        assert "smoothing" in str(exc_info.value).lower() or "0" in str(exc_info.value)
+        error_msg = str(exc_info.value)
+        assert "smoothing" in error_msg.lower()
+        assert "1.5" in error_msg
 
     def test_invalid_finish_raises_valueerror(self):
         """Finish not in {matte, satin, gloss} raises ValueError."""
         with pytest.raises(ValueError) as exc_info:
             Look(lipstick=Product("#FF0000", finish="shimmer"))
-        assert "finish" in str(exc_info.value).lower() or "shimmer" in str(exc_info.value).lower()
+        error_msg = str(exc_info.value)
+        assert "lipstick" in error_msg.lower()
+        assert "finish" in error_msg.lower()
+        assert "shimmer" in error_msg.lower()
 
     def test_non_numeric_intensity_raises_valueerror(self):
         """Non-numeric intensity raises ValueError."""
         with pytest.raises(ValueError) as exc_info:
             Look(lipstick=Product("#FF0000", intensity="0.5"))
-        assert "intensity" in str(exc_info.value).lower() or "not a number" in str(exc_info.value).lower() or "invalid" in str(exc_info.value).lower()
+        error_msg = str(exc_info.value)
+        assert "lipstick" in error_msg.lower()
+        assert "intensity" in error_msg.lower()
+        assert "string" in error_msg.lower()
 
     def test_bool_intensity_rejected(self):
         """Boolean values for intensity are rejected."""
         with pytest.raises(ValueError) as exc_info:
             Look(lipstick=Product("#FF0000", intensity=True))
-        # Message should indicate the problem
-        assert len(str(exc_info.value)) > 0
+        error_msg = str(exc_info.value)
+        assert "lipstick" in error_msg.lower()
+        assert "intensity" in error_msg.lower()
+        assert "bool" in error_msg.lower()
 
     def test_multiple_errors_collected_in_single_exception(self):
         """All validation errors are collected and reported in one ValueError."""
@@ -109,9 +125,21 @@ class TestLookValidation:
                 smoothing=2.0
             )
         error_msg = str(exc_info.value)
-        # The message should contain indicators of multiple problems
-        # We check that it's a comprehensive error message
-        assert len(error_msg) > 20  # Error message should be substantial
+        # Verify all error sources are mentioned
+        assert "lipstick" in error_msg.lower()
+        assert "eyeshadow" in error_msg.lower()
+        assert "smoothing" in error_msg.lower()
+
+    def test_non_product_field_and_smoothing_error_collected(self):
+        """Non-Product field and smoothing error are collected in one ValueError."""
+        with pytest.raises(ValueError) as exc_info:
+            Look(lipstick="red", smoothing=5)
+        error_msg = str(exc_info.value)
+        # Should mention both the lipstick type error and smoothing range error
+        assert "lipstick" in error_msg.lower()
+        assert "Product" in error_msg
+        assert "smoothing" in error_msg.lower()
+        assert "5" in error_msg
 
 
 class TestPresets:
@@ -238,4 +266,6 @@ class TestLookDictConversion:
         }
         with pytest.raises(ValueError) as exc_info:
             Look.from_dict(d)
-        assert "unknown" in str(exc_info.value).lower() or "unexpected" in str(exc_info.value).lower()
+        error_msg = str(exc_info.value)
+        assert "unknown" in error_msg.lower()
+        assert "unknown_field" in error_msg
