@@ -29,3 +29,6 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: slower tests (still run by default; no deselect configured)",
+]
