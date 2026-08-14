@@ -2,7 +2,8 @@
 
 Inputs:  reports/benchmark.json (produced by scripts/benchmark.py and
          scripts/stability_bench.py)
-Outputs: reports/figures/benchmark_metrics.png, reports/figures/presets_demo.png
+Outputs: reports/figures/benchmark_metrics.png, reports/figures/presets_demo.png,
+         reports/figures/opacity_compare.png
 
 Demo imagery uses the public-domain NASA portrait bundled with scikit-image
 (skimage.data.astronaut), so no dataset photos of private individuals are
@@ -24,6 +25,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from skimage import data  # noqa: E402
 
+from carmine import baselines, regions  # noqa: E402
 from carmine.engine import apply_look  # noqa: E402
 from carmine.landmarks import FaceLandmarker  # noqa: E402
 from carmine.look import PRESETS  # noqa: E402
@@ -96,7 +98,8 @@ def fig_benchmark(rows_by_method: dict, n_images: int) -> None:
         limit = (-0.4, 1.05) if metric == "lip_texture_kept" else (0, 1.05)
         _bars(ax, rows_by_method, metric, METRIC_TITLES[metric], limit=limit)
     fig.suptitle(
-        f"Engine vs standard failure-mode baselines -- {n_images} photos, paired portrait dataset",
+        f"Engine vs standard failure-mode baselines -- {n_images} photos, "
+        "no-makeup half of a local paired-portrait photo set",
         fontsize=11,
         fontweight="bold",
         x=0.02,
@@ -131,6 +134,58 @@ def fig_presets_demo(landmarker: FaceLandmarker) -> None:
     plt.close(fig)
 
 
+def fig_opacity_compare(landmarker: FaceLandmarker) -> None:
+    """Lip-region crops: original vs carmine vs opaque_fill, same velvet look.
+
+    `pigment_on_target` and `lip_texture_kept` can't tell a hard fill from a
+    soft tint when both share the same, correctly-indexed lip region (see
+    `carmine.metrics.lip_detail_retention`'s docstring) -- this figure makes
+    that difference visible directly, at the pixel level, instead of only
+    through a metric.
+    """
+    astro = cv2.cvtColor(data.astronaut(), cv2.COLOR_RGB2BGR)
+    lm = landmarker.detect(astro)
+    look = PRESETS["velvet"]
+
+    carmine_out = apply_look(astro, look, landmarks=lm)
+    opaque_out = baselines.opaque_fill(astro, lm, look)
+
+    lip_pts = lm[regions.LIPS_OUTER]
+    x0, y0 = lip_pts.min(axis=0)
+    x1, y1 = lip_pts.max(axis=0)
+    pad_x, pad_y = (x1 - x0) * 0.6, (y1 - y0) * 0.8
+    x0i = int(max(0, x0 - pad_x))
+    x1i = int(min(astro.shape[1], x1 + pad_x))
+    y0i = int(max(0, y0 - pad_y))
+    y1i = int(min(astro.shape[0], y1 + pad_y))
+
+    def crop(img: np.ndarray) -> np.ndarray:
+        return img[y0i:y1i, x0i:x1i]
+
+    height = 320
+    tiles = []
+    for img in (astro, carmine_out, opaque_out):
+        tile = crop(img)
+        h, w = tile.shape[:2]
+        tiles.append(cv2.resize(tile, (int(w * height / h), height), interpolation=cv2.INTER_NEAREST))
+    titles = ["original", "carmine (velvet)", "opaque_fill (velvet)"]
+
+    fig, axes = plt.subplots(1, 3, figsize=(3.4 * 3, 3.8))
+    for ax, tile, title in zip(axes, tiles, titles):
+        ax.imshow(cv2.cvtColor(tile, cv2.COLOR_BGR2RGB))
+        ax.set_title(title, fontsize=10, color=INK)
+        ax.axis("off")
+    fig.suptitle(
+        "Same lip region, same look -- hard fill vs texture-preserving tint",
+        fontsize=10.5,
+        color=INK,
+        y=1.03,
+    )
+    fig.tight_layout()
+    fig.savefig(FIGDIR / "opacity_compare.png", bbox_inches="tight")
+    plt.close(fig)
+
+
 def main() -> None:
     FIGDIR.mkdir(parents=True, exist_ok=True)
     bench = json.loads((ROOT / "reports" / "benchmark.json").read_text())
@@ -141,6 +196,7 @@ def main() -> None:
 
     landmarker = FaceLandmarker()
     fig_presets_demo(landmarker)
+    fig_opacity_compare(landmarker)
 
     print(f"figures written to {FIGDIR}")
 

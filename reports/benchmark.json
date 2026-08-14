@@ -1,4 +1,134 @@
 {
+  "stability": {
+    "protocol": "ground_truth_affine",
+    "raw": {
+      "deviation_px_iod": 0.011313962765030666,
+      "jitter_px_iod": 0.0024564776401140324
+    },
+    "one_euro": {
+      "deviation_px_iod": 0.015526284545136187,
+      "jitter_px_iod": 0.002270855562476886,
+      "min_cutoff": 1.5,
+      "beta": 0.5,
+      "meets_deviation_constraint": true
+    },
+    "grid_search": {
+      "min_cutoff_values": [
+        0.5,
+        1.0,
+        1.5
+      ],
+      "beta_values": [
+        0.007,
+        0.05,
+        0.2,
+        0.5
+      ],
+      "deviation_constraint_multiplier": 1.5,
+      "improvement_threshold_pct": 20.0,
+      "results": [
+        {
+          "min_cutoff": 0.5,
+          "beta": 0.007,
+          "deviation_px_iod": 0.07686562406122083,
+          "jitter_px_iod": 0.0063223914422248645,
+          "meets_deviation_constraint": false
+        },
+        {
+          "min_cutoff": 0.5,
+          "beta": 0.05,
+          "deviation_px_iod": 0.04341875246736846,
+          "jitter_px_iod": 0.0035322912487166153,
+          "meets_deviation_constraint": false
+        },
+        {
+          "min_cutoff": 0.5,
+          "beta": 0.2,
+          "deviation_px_iod": 0.023078413756854328,
+          "jitter_px_iod": 0.00253537862657705,
+          "meets_deviation_constraint": false
+        },
+        {
+          "min_cutoff": 0.5,
+          "beta": 0.5,
+          "deviation_px_iod": 0.016466901611088377,
+          "jitter_px_iod": 0.0024151956164085732,
+          "meets_deviation_constraint": true
+        },
+        {
+          "min_cutoff": 1.0,
+          "beta": 0.007,
+          "deviation_px_iod": 0.05198791143501865,
+          "jitter_px_iod": 0.004257903320742268,
+          "meets_deviation_constraint": false
+        },
+        {
+          "min_cutoff": 1.0,
+          "beta": 0.05,
+          "deviation_px_iod": 0.03499957376577784,
+          "jitter_px_iod": 0.002904674647655659,
+          "meets_deviation_constraint": false
+        },
+        {
+          "min_cutoff": 1.0,
+          "beta": 0.2,
+          "deviation_px_iod": 0.02122004910182758,
+          "jitter_px_iod": 0.0023547053942013247,
+          "meets_deviation_constraint": false
+        },
+        {
+          "min_cutoff": 1.0,
+          "beta": 0.5,
+          "deviation_px_iod": 0.015943961733315706,
+          "jitter_px_iod": 0.0023309020585927562,
+          "meets_deviation_constraint": true
+        },
+        {
+          "min_cutoff": 1.5,
+          "beta": 0.007,
+          "deviation_px_iod": 0.03992997239419649,
+          "jitter_px_iod": 0.0032607903704254793,
+          "meets_deviation_constraint": false
+        },
+        {
+          "min_cutoff": 1.5,
+          "beta": 0.05,
+          "deviation_px_iod": 0.02985566416512354,
+          "jitter_px_iod": 0.002529018527751973,
+          "meets_deviation_constraint": false
+        },
+        {
+          "min_cutoff": 1.5,
+          "beta": 0.2,
+          "deviation_px_iod": 0.01987011302799725,
+          "jitter_px_iod": 0.0022345391135689544,
+          "meets_deviation_constraint": false
+        },
+        {
+          "min_cutoff": 1.5,
+          "beta": 0.5,
+          "deviation_px_iod": 0.015526284545136187,
+          "jitter_px_iod": 0.002270855562476886,
+          "meets_deviation_constraint": true
+        }
+      ]
+    },
+    "selected_params": null,
+    "jitter_reduction_pct": 7.556432617417588,
+    "meets_improvement_threshold": false,
+    "note": "one_euro shows no measurable benefit on this clip: the best constraint-satisfying config (min_cutoff=1.5, beta=0.5) only reduced motion-compensated jitter by 7.6% (< 20% threshold). VideoEngine defaults left unchanged.",
+    "video_ms_per_frame": 75.84629202028736,
+    "n_frames": 90,
+    "n_frames_with_face": 90,
+    "clip_params": {
+      "fps": 30.0,
+      "noise_sigma": 6.0,
+      "noise_seed": 1234,
+      "pan_fraction": 0.04,
+      "zoom_peak": 0.06,
+      "rotate_deg": 2.0
+    }
+  },
   "photo": {
     "rows": [
       {
@@ -6,40 +136,175 @@
         "pigment_on_target": 0.36884715519336403,
         "background_untouched": 1.0,
         "lip_texture_kept": 0.8196527982290754,
+        "lip_detail_retention": 1.360194832086563,
         "identity_ssim": 0.9803227676136816,
-        "ms_per_image": 605.8013413790972
+        "ms_per_image": 5.449884571135044,
+        "spread": {
+          "pigment_on_target": [
+            0.2609793164138465,
+            0.5239682839857639
+          ],
+          "background_untouched": [
+            1.0,
+            1.0
+          ],
+          "lip_texture_kept": [
+            0.5226354252494191,
+            0.9865645517102382
+          ],
+          "lip_detail_retention": [
+            0.9744234681129456,
+            2.1521265506744385
+          ],
+          "identity_ssim": [
+            0.963119222799333,
+            0.9880043848343832
+          ],
+          "ms_per_image": [
+            3.532291972078383,
+            7.927082944661379
+          ]
+        }
       },
       {
         "method": "opaque_fill",
         "pigment_on_target": 0.9976740352741,
         "background_untouched": 1.0,
         "lip_texture_kept": 0.9865316116225145,
+        "lip_detail_retention": 0.9523712488321158,
         "identity_ssim": 0.995519094273966,
-        "ms_per_image": 603.4790065470868
+        "ms_per_image": 10.487439200425378,
+        "spread": {
+          "pigment_on_target": [
+            0.9706011358024464,
+            1.0
+          ],
+          "background_untouched": [
+            1.0,
+            1.0
+          ],
+          "lip_texture_kept": [
+            0.9499879666025962,
+            0.9950769784465108
+          ],
+          "lip_detail_retention": [
+            0.7333005666732788,
+            1.3347537517547607
+          ],
+          "identity_ssim": [
+            0.9921600634501389,
+            0.9972693154892525
+          ],
+          "ms_per_image": [
+            9.085832978598773,
+            14.440375030972064
+          ]
+        }
       },
       {
         "method": "channel_swap",
         "pigment_on_target": 0.14391160330486621,
         "background_untouched": 0.016863761665336475,
         "lip_texture_kept": 0.9721599686850866,
+        "lip_detail_retention": 0.6663659512996674,
         "identity_ssim": 0.9928948001642736,
-        "ms_per_image": 599.7506441512646
+        "ms_per_image": 274.11117472757513,
+        "spread": {
+          "pigment_on_target": [
+            0.0659938429680817,
+            0.29945715214190954
+          ],
+          "background_untouched": [
+            0.0,
+            0.14073953472429648
+          ],
+          "lip_texture_kept": [
+            0.8931370901819587,
+            0.9924305025414601
+          ],
+          "lip_detail_retention": [
+            0.6213765740394592,
+            0.7107895612716675
+          ],
+          "identity_ssim": [
+            0.9872951268517696,
+            0.9961713579591593
+          ],
+          "ms_per_image": [
+            168.0763749172911,
+            302.29983292520046
+          ]
+        }
       },
       {
         "method": "untrained_gan",
         "pigment_on_target": 0.0868313830251841,
         "background_untouched": 3.2957939266239505e-07,
         "lip_texture_kept": -0.2302168368260809,
+        "lip_detail_retention": 0.3682517288969113,
         "identity_ssim": 0.5870585600590303,
-        "ms_per_image": 598.1910720315332
+        "ms_per_image": 39.17784769482051,
+        "spread": {
+          "pigment_on_target": [
+            0.044212023012314645,
+            0.1629444766614098
+          ],
+          "background_untouched": [
+            0.0,
+            8.569064209222272e-06
+          ],
+          "lip_texture_kept": [
+            -0.853565841938573,
+            0.07414869304964855
+          ],
+          "lip_detail_retention": [
+            0.08992225676774979,
+            2.4253439903259277
+          ],
+          "identity_ssim": [
+            0.4609089902208916,
+            0.7418046729077371
+          ],
+          "ms_per_image": [
+            34.52654101420194,
+            57.9025000333786
+          ]
+        }
       },
       {
         "method": "carmine",
         "pigment_on_target": 0.8287126874832297,
         "background_untouched": 1.0,
         "lip_texture_kept": 0.983741692257315,
+        "lip_detail_retention": 0.6245405582281259,
         "identity_ssim": 0.9981173975998409,
-        "ms_per_image": 599.3537692523275
+        "ms_per_image": 275.48187346949885,
+        "spread": {
+          "pigment_on_target": [
+            0.7558268914419389,
+            0.8994695421341895
+          ],
+          "background_untouched": [
+            1.0,
+            1.0
+          ],
+          "lip_texture_kept": [
+            0.9310906222527104,
+            0.9954664893725728
+          ],
+          "lip_detail_retention": [
+            0.5849495530128479,
+            0.6563169956207275
+          ],
+          "identity_ssim": [
+            0.9961381132856258,
+            0.9991988530474099
+          ],
+          "ms_per_image": [
+            165.51674995571375,
+            339.53270909842104
+          ]
+        }
       }
     ]
   },
@@ -49,26 +314,14 @@
     "look_preset": "velvet",
     "protocol": {
       "pigment_on_target": "fraction of total pixel-change energy that falls inside the union of the lip, eyeshadow, blush, and eyeliner masks (threshold 0.05)",
+      "pigment_on_target_caveat": "opacity-blind by construction: the cutoff is a strict region-membership test (>0.05), not a soft weighting by mask value, so it scores a hard fill the same 1.0 as a feathered tint painted in the same region, and is deliberately adversarial to feathering in that sense. opaque_fill shares region geometry with this scorer, so its containment landing near 1.0 is a property of correct indexing, not evidence of a good blend -- containment cannot distinguish a hard fill from a soft tint when the geometry is already right.",
       "background_untouched": "fraction of pixels outside a dilated face-hull mask that are bit-identical between input and output",
       "lip_texture_kept": "Pearson correlation of Lab-L lightness inside the lip mask (threshold 0.5), before vs after",
+      "lip_detail_retention": "std(highpass(L_after)) / std(highpass(L_before)) inside the lip mask (threshold 0.5), where highpass(L) = L - GaussianBlur(L, sigma=5) in Lab space; catches the opacity/scale-invariance blind spot in lip_texture_kept (Pearson correlation is unchanged by an affine rescaling of a signal, so an additive flat fill can still correlate highly with the original even though it destroys detail in absolute terms)",
       "identity_ssim": "grayscale structural similarity of output vs input, whole image"
-    }
-  },
-  "stability": {
-    "raw": {
-      "mean_iou": 0.8063002563485118,
-      "centroid_drift": 0.01657908254028023
     },
-    "one_euro": {
-      "mean_iou": 0.8211953006113991,
-      "centroid_drift": 0.014708122397468692
-    },
-    "improvement_pct": {
-      "mean_iou": 1.8473321998361336,
-      "centroid_drift": 11.28506440730895
-    },
-    "video_ms_per_frame": 72.14787550037727,
-    "n_frames": 90,
-    "n_frames_with_face": 90
+    "smoothing_override": 0.0,
+    "smoothing_override_rationale": "carmine's skin smoothing legitimately edits the whole face and has no counterpart in any baseline, so leaving it on would make pigment_on_target an apples-to-oranges comparison between a method that edits the whole face and four that don't; smoothing is forced to 0.0 for every method's look in this benchmark run only.",
+    "lip_detail_retention_note": "measured ranking, highest to lowest: mismatched_indices=1.360, opaque_fill=0.952, channel_swap=0.666, carmine=0.625, untrained_gan=0.368. This is not monotonic with texture-preservation quality, and that's expected, not a bug: mismatched_indices scores near/above 1.0 largely because it paints the wrong region entirely, so the true lip region it's scored against is left almost untouched. carmine's velvet preset requests a matte lipstick finish, which deliberately damps micro-highlights inside the lip mask (see carmine.pigment.finish_matte) -- that lowers high-frequency L variance versus a pure tint by design, so carmine does not top this metric even though it's the only method with a genuine texture-preserving intent. A non-matte preset would score differently; this ranking is a property of (metric, preset) together, not of the engine in isolation."
   }
 }

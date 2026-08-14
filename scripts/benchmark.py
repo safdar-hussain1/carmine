@@ -10,10 +10,16 @@ from `carmine.metrics`:
                           (lips/eyes/blush), energy-weighted.
 * background_untouched -- fraction of off-face pixels left bit-identical.
 * lip_texture_kept    -- lip-region lightness correlation, before vs after.
+* lip_detail_retention -- lip-region high-frequency detail ratio, after vs
+                          before (not scale-invariant, unlike lip_texture_kept;
+                          see `carmine.metrics` for why both exist).
 * identity_ssim       -- grayscale SSIM of the whole image, before vs after.
 
-Aggregate (mean per method) results are written to `reports/benchmark.json`
-under the "photo" key.
+Aggregate (mean per method, plus [min, max] spread across images) results
+are written to `reports/benchmark.json` under the "photo" key. Per-method
+wall time is measured with exactly one method running per timed block
+(landmark detection happens once per image, outside every timed block, and
+is shared by all five methods).
 
 Every method is scored under the "velvet" look preset (strong pigment
 across every measurable product) so all five methods paint the same
@@ -49,10 +55,28 @@ from carmine.look import PRESETS  # noqa: E402
 
 METHODS = ["mismatched_indices", "opaque_fill", "channel_swap", "untrained_gan", "carmine"]
 
+METRIC_KEYS = (
+    "pigment_on_target",
+    "background_untouched",
+    "lip_texture_kept",
+    "lip_detail_retention",
+    "identity_ssim",
+)
+
 PROTOCOL = {
     "pigment_on_target": (
         "fraction of total pixel-change energy that falls inside the union "
         "of the lip, eyeshadow, blush, and eyeliner masks (threshold 0.05)"
+    ),
+    "pigment_on_target_caveat": (
+        "opacity-blind by construction: the cutoff is a strict region-"
+        "membership test (>0.05), not a soft weighting by mask value, so it "
+        "scores a hard fill the same 1.0 as a feathered tint painted in the "
+        "same region, and is deliberately adversarial to feathering in that "
+        "sense. opaque_fill shares region geometry with this scorer, so its "
+        "containment landing near 1.0 is a property of correct indexing, "
+        "not evidence of a good blend -- containment cannot distinguish a "
+        "hard fill from a soft tint when the geometry is already right."
     ),
     "background_untouched": (
         "fraction of pixels outside a dilated face-hull mask that are "
@@ -61,6 +85,15 @@ PROTOCOL = {
     "lip_texture_kept": (
         "Pearson correlation of Lab-L lightness inside the lip mask "
         "(threshold 0.5), before vs after"
+    ),
+    "lip_detail_retention": (
+        "std(highpass(L_after)) / std(highpass(L_before)) inside the lip "
+        "mask (threshold 0.5), where highpass(L) = L - GaussianBlur(L, "
+        "sigma=5) in Lab space; catches the opacity/scale-invariance blind "
+        "spot in lip_texture_kept (Pearson correlation is unchanged by an "
+        "affine rescaling of a signal, so an additive flat fill can still "
+        "correlate highly with the original even though it destroys detail "
+        "in absolute terms)"
     ),
     "identity_ssim": "grayscale structural similarity of output vs input, whole image",
 }
@@ -92,12 +125,18 @@ def _score(before: np.ndarray, after: np.ndarray, landmarks: np.ndarray) -> dict
         "pigment_on_target": metrics.pigment_on_target(before, after, valid),
         "background_untouched": metrics.background_untouched(before, after, face),
         "lip_texture_kept": metrics.lip_texture_kept(before, after, lip),
+        "lip_detail_retention": metrics.lip_detail_retention(before, after, lip),
         "identity_ssim": metrics.identity_ssim(before, after),
     }
 
 
-def _run_methods(image: np.ndarray, landmarks: np.ndarray, look) -> dict[str, np.ndarray]:
-    """Run every method on one image, returning {method: output}.
+def _method_thunks(image: np.ndarray, landmarks: np.ndarray, look):
+    """Build {method: zero-arg thunk} for one image, so each method's wall
+    time can be measured in isolation.
+
+    Landmark detection has already happened by the time this is called and
+    is never inside a timed thunk -- every thunk here does only the paint
+    work for its one method, nothing else's.
 
     Per-method input semantics are faithful to the studio-v1 driver this was
     ported from, adapted to this codebase's baseline signatures:
@@ -112,16 +151,18 @@ def _run_methods(image: np.ndarray, landmarks: np.ndarray, look) -> dict[str, np
       this baseline; the mesh landmarks already detected for every other
       method are passed straight through.
     * `opaque_fill` and `channel_swap` take the correct mesh landmarks, same
-      as the real engine.
+      as the real engine. `channel_swap` internally calls `apply_look` and
+      then does one extra color-space conversion, so its timing is expected
+      to track `carmine`'s plus a small constant overhead.
     * `untrained_gan` takes only the image (and `look`, unused, for
       interface parity); no landmarks needed.
     """
     return {
-        "mismatched_indices": baselines.mismatched_indices(image, landmarks, look),
-        "opaque_fill": baselines.opaque_fill(image, landmarks, look),
-        "channel_swap": baselines.channel_swap(image, landmarks, look),
-        "untrained_gan": baselines.untrained_gan(image, look),
-        "carmine": apply_look(image, look, landmarks=landmarks),
+        "mismatched_indices": lambda: baselines.mismatched_indices(image, landmarks, look),
+        "opaque_fill": lambda: baselines.opaque_fill(image, landmarks, look),
+        "channel_swap": lambda: baselines.channel_swap(image, landmarks, look),
+        "untrained_gan": lambda: baselines.untrained_gan(image, look),
+        "carmine": lambda: apply_look(image, look, landmarks=landmarks),
     }
 
 
@@ -160,9 +201,10 @@ def main() -> int:
             skipped.append({"name": path.name, "reason": "no face detected"})
             continue
 
+        thunks = _method_thunks(image, landmarks, benchmark_look)
         for method in METHODS:
             t0 = time.perf_counter()
-            out = _run_methods(image, landmarks, benchmark_look)[method]
+            out = thunks[method]()
             elapsed_ms = (time.perf_counter() - t0) * 1000
             runtimes[method].append(elapsed_ms)
             per_image[method].append(_score(image, out, landmarks))
@@ -172,18 +214,50 @@ def main() -> int:
     for method in METHODS:
         scores = per_image[method]
         row = {"method": method}
-        for key in ("pigment_on_target", "background_untouched", "lip_texture_kept", "identity_ssim"):
-            row[key] = float(np.mean([s[key] for s in scores]))
+        spread = {}
+        for key in METRIC_KEYS:
+            values = [s[key] for s in scores]
+            row[key] = float(np.mean(values))
+            spread[key] = [float(np.min(values)), float(np.max(values))]
         row["ms_per_image"] = float(np.mean(runtimes[method]))
+        spread["ms_per_image"] = [float(np.min(runtimes[method])), float(np.max(runtimes[method]))]
+        row["spread"] = spread
         rows.append(row)
 
     n_images = len(per_image[METHODS[0]])
+
+    detail_by_method = {row["method"]: row["lip_detail_retention"] for row in rows}
+    ranked = sorted(detail_by_method, key=lambda m: detail_by_method[m], reverse=True)
+    lip_detail_retention_note = (
+        "measured ranking, highest to lowest: "
+        + ", ".join(f"{m}={detail_by_method[m]:.3f}" for m in ranked)
+        + ". This is not monotonic with texture-preservation quality, and that's expected, "
+        "not a bug: mismatched_indices scores near/above 1.0 largely because it paints the "
+        "wrong region entirely, so the true lip region it's scored against is left almost "
+        "untouched. carmine's velvet preset requests a matte lipstick finish, which "
+        "deliberately damps micro-highlights inside the lip mask (see "
+        "carmine.pigment.finish_matte) -- that lowers high-frequency L variance versus a "
+        "pure tint by design, so carmine does not top this metric even though it's the only "
+        "method with a genuine texture-preserving intent. A non-matte preset would score "
+        "differently; this ranking is a property of (metric, preset) together, not of the "
+        "engine in isolation."
+    )
+
     result = {
         "photo": {"rows": rows},
         "meta": {
             "n_images": n_images,
             "skipped": skipped,
             "look_preset": "velvet",
+            "smoothing_override": 0.0,
+            "smoothing_override_rationale": (
+                "carmine's skin smoothing legitimately edits the whole face and has "
+                "no counterpart in any baseline, so leaving it on would make "
+                "pigment_on_target an apples-to-oranges comparison between a method "
+                "that edits the whole face and four that don't; smoothing is forced "
+                "to 0.0 for every method's look in this benchmark run only."
+            ),
+            "lip_detail_retention_note": lip_detail_retention_note,
             "protocol": PROTOCOL,
         },
     }
@@ -199,13 +273,17 @@ def main() -> int:
     out_json.write_text(json.dumps(result, indent=2))
     print(f"\nwrote {out_json}")
 
-    print(f"\n{'method':<20}{'on_target':>10}{'backgnd':>9}{'lip_tex':>9}{'ssim':>7}{'ms':>8}")
+    print(
+        f"\n{'method':<20}{'on_target':>10}{'backgnd':>9}{'lip_tex':>9}"
+        f"{'detail':>8}{'ssim':>7}{'ms':>8}"
+    )
     for row in rows:
         print(
             f"{row['method']:<20}"
             f"{row['pigment_on_target']:>10.3f}"
             f"{row['background_untouched']:>9.3f}"
             f"{row['lip_texture_kept']:>9.3f}"
+            f"{row['lip_detail_retention']:>8.3f}"
             f"{row['identity_ssim']:>7.3f}"
             f"{row['ms_per_image']:>8.1f}"
         )

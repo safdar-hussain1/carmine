@@ -13,11 +13,26 @@ was rejected as a protocol).
   changed, so a few rounding-noise pixels don't count the same as an opaque
   polygon) landed inside the legitimate target region. High is good;
   painting outside the mask (wrong region, background, chin) lowers it.
+  This is deliberately blind to *how* the region was painted, only *where*:
+  a method that paints the exactly-correct region opaquely scores the same
+  1.0 as one that feathers a soft tint into it, and the cutoff is a strict
+  region membership test rather than a soft weighting by mask value, so it
+  is adversarial to feathering in that specific sense too.
 * `background_untouched` -- fraction of pixels outside the face that stayed
   bit-identical. 1.0 means the method never touched anything off-face.
 * `lip_texture_kept` -- Pearson correlation of lip-region lightness (Lab L
-  channel) before vs after. A texture-preserving tint keeps this high; an
-  opaque flat fill erases the correlation.
+  channel) before vs after. A texture-preserving tint keeps this high, but
+  because Pearson correlation is invariant to any affine (scale + shift)
+  transform of a signal, an *additive* flat fill (e.g. `out = in + alpha *
+  color`, as opposed to an overwrite) can also score high here even though
+  it destroys texture in absolute terms -- see `lip_detail_retention` for a
+  metric that isn't blind to that case.
+* `lip_detail_retention` -- ratio of the lip region's local high-frequency
+  detail (Lab L high-pass) standard deviation, after vs before. Unlike
+  `lip_texture_kept`, this is not scale-invariant, so it distinguishes a
+  texture-preserving tint from a flattening fill even when both share the
+  same region geometry (e.g. `opaque_fill` and the real engine painting
+  the same, correctly-indexed lip polygon).
 * `identity_ssim` -- grayscale structural similarity of the whole image,
   before vs after. Makeup should restyle a photo, not replace it.
 
@@ -40,6 +55,7 @@ __all__ = [
     "background_untouched",
     "lip_texture_kept",
     "identity_ssim",
+    "lip_detail_retention",
     "mask_jitter",
 ]
 
@@ -138,6 +154,54 @@ def lip_texture_kept(before: np.ndarray, after: np.ndarray, lip_mask: np.ndarray
     if l_before.std() < 1e-6 or l_after.std() < 1e-6:
         return 0.0
     return float(np.corrcoef(l_before, l_after)[0, 1])
+
+
+def _highpass_l(bgr: np.ndarray, sigma: float = 5.0) -> np.ndarray:
+    """Lab L channel minus its own Gaussian blur: the local micro-detail."""
+    l_channel = cv2.cvtColor(bgr.astype(np.float32) / 255.0, cv2.COLOR_BGR2Lab)[..., 0]
+    blurred = cv2.GaussianBlur(l_channel, (0, 0), sigmaX=sigma)
+    return l_channel - blurred
+
+
+def lip_detail_retention(before: np.ndarray, after: np.ndarray, lip_mask: np.ndarray) -> float:
+    """Ratio of retained high-frequency lip detail, after vs before.
+
+    `pigment_on_target` and `lip_texture_kept` are both blind to *opacity*
+    when a method's region geometry is already correct: a hard, flat fill
+    painted in exactly the right polygon scores perfectly on containment,
+    and Pearson correlation (what `lip_texture_kept` measures) is invariant
+    to any affine rescaling of a signal, so an additive flat fill can still
+    correlate highly with the original even though it destroys texture. This
+    metric measures a different thing: how much of the lip region's local
+    micro-detail (Lab L high-pass: L minus its own sigma=5 Gaussian blur)
+    survives in absolute terms, via the ratio of its standard deviation
+    after vs before. A texture-preserving tint keeps this near 1.0; a fill
+    that flattens the region toward a constant color drives it toward 0.
+
+    Args:
+        before: BGR uint8 input image.
+        after: BGR uint8 output image (resized to match `before` if needed).
+        lip_mask: Float or bool array of shape `before.shape[:2]`; values
+            above 0.5 mark the lip region scored.
+
+    Returns:
+        A float >= 0. 1.0 means the high-pass detail's spread is unchanged;
+        0.0 means the region became perfectly flat; values above 1.0 are
+        possible if a method adds noise/contrast rather than removing it.
+
+    Raises:
+        ValueError: If `lip_mask` selects no pixels.
+    """
+    after = _resize_to_match(before, after)
+    inside = np.asarray(lip_mask) > 0.5
+    if not np.any(inside):
+        raise ValueError("lip_mask selects no pixels")
+    detail_before = _highpass_l(before)[inside]
+    detail_after = _highpass_l(after)[inside]
+    std_before = float(detail_before.std())
+    if std_before < 1e-6:
+        return 0.0 if float(detail_after.std()) < 1e-6 else float("inf")
+    return float(detail_after.std() / std_before)
 
 
 def identity_ssim(before: np.ndarray, after: np.ndarray) -> float:
