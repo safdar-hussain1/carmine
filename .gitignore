@@ -8,13 +8,15 @@ build/
 .venv/
 venv/
 *.task
+!web/public/models/face_landmarker.task
+!docs/models/face_landmarker.task
 *.dat
 *.dat.bz2
 data/
 node_modules/
 web/node_modules/
 .DS_Store
-assets/
+/assets/
 private/
 reports/parity_fixtures/
 .superpowers/
