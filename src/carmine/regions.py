@@ -28,14 +28,16 @@ LEFT_EYE = [263, 249, 390, 373, 374, 380, 381, 382, 362, 398, 384, 385, 386, 387
 RIGHT_EYE_UPPER = [133, 173, 157, 158, 159, 160, 161, 246, 33]
 LEFT_EYE_UPPER = [362, 398, 384, 385, 386, 387, 388, 466, 263]
 
-# Lower eyebrow edges, ordered in the same direction as the matching upper-lid arc.
+# Lower eyebrow edges, ordered from inner point (55/285) to outer/junction point (70/300).
 RIGHT_BROW_LOWER = [55, 65, 52, 53, 46, 70]
 LEFT_BROW_LOWER = [285, 295, 282, 283, 276, 300]
 
-# Upper eyebrow edges. When concatenated as LOWER + reversed(UPPER), they form
-# a closed polygon around the eyebrow region.
-RIGHT_BROW_UPPER = [70, 63, 105, 66, 107]
-LEFT_BROW_UPPER = [300, 293, 334, 296, 336]
+# Upper eyebrow edges, ordered from inner point (107/336) to outer/junction point (70/300).
+# When traversed as LOWER + reversed(UPPER), they trace the eyebrow perimeter as a closed
+# polygon. The junction points (70 and 300) appear in both rings; polygon builders must
+# handle the shared endpoints.
+RIGHT_BROW_UPPER = [107, 66, 105, 63, 70]
+LEFT_BROW_UPPER = [336, 296, 334, 293, 300]
 
 # Face boundary contour, used to define the skin mask.
 FACE_OVAL = [

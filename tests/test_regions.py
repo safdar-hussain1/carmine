@@ -77,45 +77,54 @@ class TestIndexBounds:
 
 
 class TestBrowPolygons:
-    """Verify that brow arcs form valid closed polygons."""
+    """Verify that brow arcs form valid closed polygons with correct traversal order."""
 
-    def test_right_brow_forms_polygon(self):
-        """RIGHT_BROW_LOWER + reversed RIGHT_BROW_UPPER should form a closed polygon."""
-        # The polygon is formed by concatenating lower + reversed(upper), which
-        # may share connection indices at the boundaries.
+    def test_right_brow_upper_exact_values(self):
+        """RIGHT_BROW_UPPER must have exact ordering for proper polygon closure."""
+        # Stored as inner→outer (107→70); when reversed, becomes outer→inner (70→107)
+        # allowing LOWER + reversed(UPPER) to form a closed path
+        assert RIGHT_BROW_UPPER == [107, 66, 105, 63, 70]
+
+    def test_left_brow_upper_exact_values(self):
+        """LEFT_BROW_UPPER must have exact ordering for proper polygon closure."""
+        # Stored as inner→outer (336→300); when reversed, becomes outer→inner (300→336)
+        # allowing LOWER + reversed(UPPER) to form a closed path
+        assert LEFT_BROW_UPPER == [336, 296, 334, 293, 300]
+
+    def test_right_brow_traversal_order(self):
+        """RIGHT_BROW arcs connect inner endpoint to shared junction point."""
+        # RIGHT_BROW_LOWER: 55 (inner) → 70 (junction)
+        assert RIGHT_BROW_LOWER[0] == 55, "Right brow lower starts at inner point"
+        assert RIGHT_BROW_LOWER[-1] == 70, "Right brow lower ends at junction point"
+
+        # RIGHT_BROW_UPPER: 107 (inner) → 70 (junction), same junction as lower
+        assert RIGHT_BROW_UPPER[0] == 107, "Right brow upper starts at inner point"
+        assert RIGHT_BROW_UPPER[-1] == 70, "Right brow upper ends at junction point"
+
+    def test_left_brow_traversal_order(self):
+        """LEFT_BROW arcs connect inner endpoint to shared junction point."""
+        # LEFT_BROW_LOWER: 285 (inner) → 300 (junction)
+        assert LEFT_BROW_LOWER[0] == 285, "Left brow lower starts at inner point"
+        assert LEFT_BROW_LOWER[-1] == 300, "Left brow lower ends at junction point"
+
+        # LEFT_BROW_UPPER: 336 (inner) → 300 (junction), same junction as lower
+        assert LEFT_BROW_UPPER[0] == 336, "Left brow upper starts at inner point"
+        assert LEFT_BROW_UPPER[-1] == 300, "Left brow upper ends at junction point"
+
+    def test_right_brow_polygon_closure(self):
+        """Verify RIGHT_BROW_LOWER + reversed(UPPER) forms a complete perimeter."""
+        # Polygon path: 55→...→70→70→...→107 (with shared junction at index 70)
         combined = RIGHT_BROW_LOWER + RIGHT_BROW_UPPER[::-1]
-        # Allow exactly one or two shared indices for polygon closure
-        unique_count = len(set(combined))
-        total_count = len(combined)
-        # Either all unique, or sharing one junction point
-        assert unique_count >= total_count - 2, (
-            f"Right brow polygon has too many duplicates: "
-            f"{total_count} total, {unique_count} unique"
+        # The junction point (70) appears exactly twice (once at end of LOWER, once at
+        # start of reversed UPPER), which is valid for polygon construction
+        assert combined.count(70) == 2, (
+            f"Junction point 70 should appear twice in polygon; got {combined.count(70)}"
         )
 
-    def test_left_brow_forms_polygon(self):
-        """LEFT_BROW_LOWER + reversed LEFT_BROW_UPPER should form a closed polygon."""
+    def test_left_brow_polygon_closure(self):
+        """Verify LEFT_BROW_LOWER + reversed(UPPER) forms a complete perimeter."""
+        # Polygon path: 285→...→300→300→...→336 (with shared junction at index 300)
         combined = LEFT_BROW_LOWER + LEFT_BROW_UPPER[::-1]
-        unique_count = len(set(combined))
-        total_count = len(combined)
-        assert unique_count >= total_count - 2, (
-            f"Left brow polygon has too many duplicates: "
-            f"{total_count} total, {unique_count} unique"
-        )
-
-    def test_brow_lower_and_upper_no_overlap(self):
-        """Brow lower and upper arcs may share junction points."""
-        right_lower_set = set(RIGHT_BROW_LOWER)
-        right_upper_set = set(RIGHT_BROW_UPPER)
-        # They should share at most one junction point (at the ends)
-        overlap = len(right_lower_set & right_upper_set)
-        assert overlap <= 1, (
-            f"Right brow lower and upper share {overlap} indices; expected at most 1"
-        )
-
-        left_lower_set = set(LEFT_BROW_LOWER)
-        left_upper_set = set(LEFT_BROW_UPPER)
-        overlap = len(left_lower_set & left_upper_set)
-        assert overlap <= 1, (
-            f"Left brow lower and upper share {overlap} indices; expected at most 1"
+        assert combined.count(300) == 2, (
+            f"Junction point 300 should appear twice in polygon; got {combined.count(300)}"
         )
