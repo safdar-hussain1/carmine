@@ -13,6 +13,10 @@ from `carmine.metrics`:
 * lip_detail_retention -- lip-region high-frequency detail ratio, after vs
                           before (not scale-invariant, unlike lip_texture_kept;
                           see `carmine.metrics` for why both exist).
+* lip_luminance_shift -- absolute mean Lab-L shift inside the lip region,
+                          before vs after (lower is better); catches
+                          brightness blowout that additive/opaque compositing
+                          causes even when detail is otherwise preserved.
 * identity_ssim       -- grayscale SSIM of the whole image, before vs after.
 
 Aggregate (mean per method, plus [min, max] spread across images) results
@@ -23,11 +27,20 @@ is shared by all five methods).
 
 Every method is scored under the "velvet" look preset (strong pigment
 across every measurable product) so all five methods paint the same
-requested colors and intensities. `carmine`'s own skin smoothing is
-disabled for this run only: smoothing legitimately edits the whole face
-and has no counterpart in any baseline, so leaving it on would make
-pigment_on_target an apples-to-oranges comparison between a method that
-edits the whole face and four that don't.
+requested colors and intensities, with two overrides applied to every
+method's look for this run only:
+
+* `smoothing` forced to 0.0 -- carmine's skin smoothing legitimately edits
+  the whole face and has no counterpart in any baseline, so leaving it on
+  would make pigment_on_target an apples-to-oranges comparison between a
+  method that edits the whole face and four that don't.
+* lipstick `finish` forced to "satin" (velvet's preset default is "matte")
+  -- a matte finish deliberately damps micro-highlights as its whole
+  artistic point (see `carmine.pigment.finish_matte`), which would make
+  lip_detail_retention measure that deliberate effect rather than engine
+  texture-preservation quality. Matte/gloss finish behavior is shown
+  instead in `reports/figures/presets_demo.png`, where it's an intentional
+  choice rather than a confound in a metric meant to catch texture loss.
 
 Usage:
     python scripts/benchmark.py --dataset data/no_makeup --out reports
@@ -60,6 +73,7 @@ METRIC_KEYS = (
     "background_untouched",
     "lip_texture_kept",
     "lip_detail_retention",
+    "lip_luminance_shift",
     "identity_ssim",
 )
 
@@ -95,6 +109,15 @@ PROTOCOL = {
         "correlate highly with the original even though it destroys detail "
         "in absolute terms)"
     ),
+    "lip_luminance_shift": (
+        "abs(mean(L_after) - mean(L_before)) inside the lip mask (threshold "
+        "0.5), in Lab-L units; lower is better. Some shift is inherent to "
+        "applying any pigment at all -- the signature of additive/opaque "
+        "compositing specifically is a LARGE shift, since that compositing "
+        "path has no mechanism holding mean brightness close to the "
+        "original the way a texture-preserving tint's lightness_pull cap "
+        "does"
+    ),
     "identity_ssim": "grayscale structural similarity of output vs input, whole image",
 }
 
@@ -126,6 +149,7 @@ def _score(before: np.ndarray, after: np.ndarray, landmarks: np.ndarray) -> dict
         "background_untouched": metrics.background_untouched(before, after, face),
         "lip_texture_kept": metrics.lip_texture_kept(before, after, lip),
         "lip_detail_retention": metrics.lip_detail_retention(before, after, lip),
+        "lip_luminance_shift": metrics.lip_luminance_shift(before, after, lip),
         "identity_ssim": metrics.identity_ssim(before, after),
     }
 
@@ -179,7 +203,11 @@ def main() -> int:
         parser.error(f"dataset directory not found: {args.dataset}")
 
     landmarker = FaceLandmarker()
-    benchmark_look = dataclasses.replace(PRESETS["velvet"], smoothing=0.0)
+    benchmark_look = dataclasses.replace(
+        PRESETS["velvet"],
+        lipstick=dataclasses.replace(PRESETS["velvet"].lipstick, finish="satin"),
+        smoothing=0.0,
+    )
 
     per_image: dict[str, list[dict]] = {m: [] for m in METHODS}
     runtimes: dict[str, list[float]] = {m: [] for m in METHODS}
@@ -231,16 +259,24 @@ def main() -> int:
     lip_detail_retention_note = (
         "measured ranking, highest to lowest: "
         + ", ".join(f"{m}={detail_by_method[m]:.3f}" for m in ranked)
-        + ". This is not monotonic with texture-preservation quality, and that's expected, "
-        "not a bug: mismatched_indices scores near/above 1.0 largely because it paints the "
+        + f". carmine={detail_by_method['carmine']:.3f}: overriding the benchmark's lipstick "
+        "finish to satin (see meta.finish_override) removed the matte-finish damping that "
+        "previously suppressed this number, raising it, but carmine's own texture-preserving "
+        "tint still pulls lightness partway toward the target color (see "
+        "carmine.pigment.tint's lightness_pull), which mechanically scales down high-frequency "
+        "L variance by roughly that same fraction even with no finish pass at all -- so this "
+        "number is not expected to reach 1.0 even for carmine's own honest tint. "
+        "mismatched_indices scores near/above 1.0 for an unrelated reason -- it paints the "
         "wrong region entirely, so the true lip region it's scored against is left almost "
-        "untouched. carmine's velvet preset requests a matte lipstick finish, which "
-        "deliberately damps micro-highlights inside the lip mask (see "
-        "carmine.pigment.finish_matte) -- that lowers high-frequency L variance versus a "
-        "pure tint by design, so carmine does not top this metric even though it's the only "
-        "method with a genuine texture-preserving intent. A non-matte preset would score "
-        "differently; this ranking is a property of (metric, preset) together, not of the "
-        "engine in isolation."
+        "untouched, not because its texture handling is good."
+    )
+    luminance_by_method = {row["method"]: row["lip_luminance_shift"] for row in rows}
+    ranked_luminance = sorted(luminance_by_method, key=lambda m: luminance_by_method[m])
+    lip_luminance_shift_note = (
+        "measured ranking, lowest (best) to highest shift: "
+        + ", ".join(f"{m}={luminance_by_method[m]:.2f}" for m in ranked_luminance)
+        + " (Lab-L units, 0-100 scale). Published as measured; not tuned to make any "
+        "particular method win."
     )
 
     result = {
@@ -257,7 +293,19 @@ def main() -> int:
                 "that edits the whole face and four that don't; smoothing is forced "
                 "to 0.0 for every method's look in this benchmark run only."
             ),
+            "finish_override": "satin",
+            "finish_override_rationale": (
+                "texture metrics must measure preservation, not a deliberate matte "
+                "effect: the velvet preset's default lipstick finish is matte, which "
+                "intentionally damps micro-highlights (carmine.pigment.finish_matte); "
+                "left as-is, lip_detail_retention would measure that deliberate "
+                "artistic choice rather than the engine's texture-preservation "
+                "quality. Lipstick finish is forced to satin for every method's look "
+                "in this benchmark run only; matte/gloss finish behavior is shown "
+                "instead in reports/figures/presets_demo.png."
+            ),
             "lip_detail_retention_note": lip_detail_retention_note,
+            "lip_luminance_shift_note": lip_luminance_shift_note,
             "protocol": PROTOCOL,
         },
     }
@@ -275,7 +323,7 @@ def main() -> int:
 
     print(
         f"\n{'method':<20}{'on_target':>10}{'backgnd':>9}{'lip_tex':>9}"
-        f"{'detail':>8}{'ssim':>7}{'ms':>8}"
+        f"{'detail':>8}{'lum_shift':>10}{'ssim':>7}{'ms':>8}"
     )
     for row in rows:
         print(
@@ -284,6 +332,7 @@ def main() -> int:
             f"{row['background_untouched']:>9.3f}"
             f"{row['lip_texture_kept']:>9.3f}"
             f"{row['lip_detail_retention']:>8.3f}"
+            f"{row['lip_luminance_shift']:>10.3f}"
             f"{row['identity_ssim']:>7.3f}"
             f"{row['ms_per_image']:>8.1f}"
         )

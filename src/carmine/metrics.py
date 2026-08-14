@@ -33,6 +33,13 @@ was rejected as a protocol).
   texture-preserving tint from a flattening fill even when both share the
   same region geometry (e.g. `opaque_fill` and the real engine painting
   the same, correctly-indexed lip polygon).
+* `lip_luminance_shift` -- absolute mean Lab-L shift inside the lip region,
+  before vs after. `lip_detail_retention` catches local micro-detail loss,
+  but additive/opaque compositing with correct region geometry doesn't
+  necessarily lose detail (it can preserve relative variation right up to
+  saturation) -- its real signature is shifting the whole region's mean
+  brightness by a large amount, which this metric isolates. Lower is
+  better; some nonzero shift is inherent to applying any pigment at all.
 * `identity_ssim` -- grayscale structural similarity of the whole image,
   before vs after. Makeup should restyle a photo, not replace it.
 
@@ -56,6 +63,7 @@ __all__ = [
     "lip_texture_kept",
     "identity_ssim",
     "lip_detail_retention",
+    "lip_luminance_shift",
     "mask_jitter",
 ]
 
@@ -202,6 +210,43 @@ def lip_detail_retention(before: np.ndarray, after: np.ndarray, lip_mask: np.nda
     if std_before < 1e-6:
         return 0.0 if float(detail_after.std()) < 1e-6 else float("inf")
     return float(detail_after.std() / std_before)
+
+
+def lip_luminance_shift(before: np.ndarray, after: np.ndarray, lip_mask: np.ndarray) -> float:
+    """Absolute mean Lab-L shift inside the lip region, before vs after.
+
+    `lip_detail_retention` catches loss of *local* micro-detail, but a hard
+    fill with the region geometry already correct doesn't necessarily lose
+    detail -- additive compositing (`out = in + alpha * color`) preserves
+    the original signal's relative variation right up until it saturates.
+    What it does instead is shift the whole region's brightness: this
+    metric is that shift, in absolute Lab-L units, averaged over the lip
+    mask. A moderate shift is inherent to applying any pigment at all (even
+    a texture-preserving tint nudges lightness a little); the signature of
+    additive/opaque compositing specifically is a *large* shift, since nothing
+    in that compositing path holds the result's mean brightness close to the
+    original the way a texture-preserving tint's `lightness_pull` cap does.
+
+    Args:
+        before: BGR uint8 input image.
+        after: BGR uint8 output image (resized to match `before` if needed).
+        lip_mask: Float or bool array of shape `before.shape[:2]`; values
+            above 0.5 mark the lip region scored.
+
+    Returns:
+        A float >= 0, in Lab-L units (0-100 scale). Lower is better; 0.0
+        means the region's mean lightness is unchanged.
+
+    Raises:
+        ValueError: If `lip_mask` selects no pixels.
+    """
+    after = _resize_to_match(before, after)
+    inside = np.asarray(lip_mask) > 0.5
+    if not np.any(inside):
+        raise ValueError("lip_mask selects no pixels")
+    l_before = cv2.cvtColor(before, cv2.COLOR_BGR2Lab)[..., 0][inside].astype(float)
+    l_after = cv2.cvtColor(after, cv2.COLOR_BGR2Lab)[..., 0][inside].astype(float)
+    return float(abs(l_after.mean() - l_before.mean()))
 
 
 def identity_ssim(before: np.ndarray, after: np.ndarray) -> float:

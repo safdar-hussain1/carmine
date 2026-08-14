@@ -52,11 +52,20 @@ LABELS = {
     "untrained_gan": "Untrained GAN",
     "carmine": "This engine",
 }
-METRICS = ["pigment_on_target", "background_untouched", "lip_texture_kept", "identity_ssim"]
+METRICS = [
+    "pigment_on_target",
+    "background_untouched",
+    "lip_texture_kept",
+    "lip_detail_retention",
+    "lip_luminance_shift",
+    "identity_ssim",
+]
 METRIC_TITLES = {
     "pigment_on_target": "Edit energy inside legitimate product regions",
     "background_untouched": "Background pixels left bit-identical",
     "lip_texture_kept": "Lip texture preserved (lightness corr.)",
+    "lip_detail_retention": "Lip high-freq. detail retained (after / before)",
+    "lip_luminance_shift": "Lip brightness shift, |ΔL| (lower is better)",
     "identity_ssim": "Identity SSIM vs input",
 }
 
@@ -75,7 +84,7 @@ plt.rcParams.update(
 )
 
 
-def _bars(ax, rows_by_method, metric, title, limit=(0, 1.05)):
+def _bars(ax, rows_by_method, metric, title, limit=(0, 1.05), fmt="{:.2f}"):
     methods = list(SERIES)
     values = [rows_by_method[m][metric] for m in methods]
     y = np.arange(len(methods))
@@ -88,15 +97,27 @@ def _bars(ax, rows_by_method, metric, title, limit=(0, 1.05)):
     ax.tick_params(length=0)
     for spine in ("top", "right", "left"):
         ax.spines[spine].set_visible(False)
+    span = limit[1] - limit[0]
     for yi, v in zip(y, values):
-        ax.text(max(v, limit[0]) + 0.02, yi, f"{v:.2f}", va="center", fontsize=8.5, color=SECONDARY)
+        ax.text(max(v, limit[0]) + span * 0.015, yi, fmt.format(v), va="center", fontsize=8.5, color=SECONDARY)
 
 
 def fig_benchmark(rows_by_method: dict, n_images: int) -> None:
-    fig, axes = plt.subplots(2, 2, figsize=(9.5, 5.4))
+    luminance_max = max(rows_by_method[m]["lip_luminance_shift"] for m in SERIES)
+    luminance_limit = (0, luminance_max * 1.15)
+
+    limits = {
+        "lip_texture_kept": (-0.4, 1.05),
+        "lip_detail_retention": (0, max(1.5, max(rows_by_method[m]["lip_detail_retention"] for m in SERIES) * 1.1)),
+        "lip_luminance_shift": luminance_limit,
+    }
+    fmts = {"lip_luminance_shift": "{:.1f}"}
+
+    fig, axes = plt.subplots(2, 3, figsize=(15, 5.8))
     for ax, metric in zip(axes.flat, METRICS):
-        limit = (-0.4, 1.05) if metric == "lip_texture_kept" else (0, 1.05)
-        _bars(ax, rows_by_method, metric, METRIC_TITLES[metric], limit=limit)
+        limit = limits.get(metric, (0, 1.05))
+        fmt = fmts.get(metric, "{:.2f}")
+        _bars(ax, rows_by_method, metric, METRIC_TITLES[metric], limit=limit, fmt=fmt)
     fig.suptitle(
         f"Engine vs standard failure-mode baselines -- {n_images} photos, "
         "no-makeup half of a local paired-portrait photo set",
@@ -105,7 +126,8 @@ def fig_benchmark(rows_by_method: dict, n_images: int) -> None:
         x=0.02,
         ha="left",
     )
-    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    fig.tight_layout(rect=(0, 0, 1, 0.95), w_pad=3.5)
+    fig.subplots_adjust(wspace=0.45)
     fig.savefig(FIGDIR / "benchmark_metrics.png")
     plt.close(fig)
 

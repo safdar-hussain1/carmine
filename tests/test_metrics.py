@@ -113,6 +113,39 @@ class TestLipDetailRetention:
             metrics.lip_detail_retention(before, before.copy(), np.zeros((10, 10), dtype=np.float32))
 
 
+class TestLipLuminanceShift:
+    def test_no_change_scores_zero(self):
+        before = _textured_patch((20, 20), seed=8)
+        mask = np.ones((20, 20), dtype=np.float32)
+        assert metrics.lip_luminance_shift(before, before.copy(), mask) == pytest.approx(0.0, abs=1e-6)
+
+    def test_uniform_brightening_scores_the_shift_amount(self):
+        before = _flat_image((20, 20), (100, 100, 100))
+        mask = np.ones((20, 20), dtype=np.float32)
+        after = _flat_image((20, 20), (150, 150, 150))
+        l_before = cv2.cvtColor(before, cv2.COLOR_BGR2Lab)[..., 0][0, 0]
+        l_after = cv2.cvtColor(after, cv2.COLOR_BGR2Lab)[..., 0][0, 0]
+        expected = abs(float(l_after) - float(l_before))
+        score = metrics.lip_luminance_shift(before, after, mask)
+        assert score == pytest.approx(expected, abs=0.5)
+
+    def test_large_additive_shift_beats_small_tint_shift(self):
+        # A big, uniform additive brightening (opaque_fill's signature
+        # defect) should register a much larger shift than a modest tint.
+        before = _textured_patch((20, 20), seed=9)
+        mask = np.ones((20, 20), dtype=np.float32)
+        big_shift = np.clip(before.astype(np.int16) + 80, 0, 255).astype(np.uint8)
+        small_shift = np.clip(before.astype(np.int16) + 8, 0, 255).astype(np.uint8)
+        big_score = metrics.lip_luminance_shift(before, big_shift, mask)
+        small_score = metrics.lip_luminance_shift(before, small_shift, mask)
+        assert big_score > small_score
+
+    def test_empty_mask_raises(self):
+        before = _textured_patch((10, 10))
+        with pytest.raises(ValueError):
+            metrics.lip_luminance_shift(before, before.copy(), np.zeros((10, 10), dtype=np.float32))
+
+
 class TestIdentitySsim:
     def test_identical_images_score_one(self):
         before = _textured_patch((32, 32), seed=4)
@@ -170,6 +203,7 @@ class TestBenchmarkJsonSchema:
         "background_untouched",
         "lip_texture_kept",
         "lip_detail_retention",
+        "lip_luminance_shift",
         "identity_ssim",
     )
     METHODS = {"mismatched_indices", "opaque_fill", "channel_swap", "untrained_gan", "carmine"}
@@ -219,7 +253,9 @@ class TestBenchmarkJsonSchema:
         # Pins the actual measured ranking (see meta.lip_detail_retention_note
         # for why it isn't monotonic with texture-preservation quality) so a
         # regenerated benchmark.json that flips this ordering fails loudly
-        # instead of silently.
+        # instead of silently. Measured with the benchmark's lipstick finish
+        # overridden to satin (meta.finish_override) so this is no longer
+        # confounded by velvet's default matte finish.
         rows = {row["method"]: row["lip_detail_retention"] for row in bench["photo"]["rows"]}
         assert (
             rows["mismatched_indices"]
@@ -229,6 +265,21 @@ class TestBenchmarkJsonSchema:
             > rows["untrained_gan"]
         )
 
+    def test_lip_luminance_shift_ordering_matches_measured_reality(self, bench):
+        # Pins the actual measured ranking (ascending = best to worst; lower
+        # shift is better). opaque_fill's additive compositing has no
+        # mechanism holding mean brightness close to the original, so its
+        # shift should be, and is measured to be, far larger than carmine's.
+        rows = {row["method"]: row["lip_luminance_shift"] for row in bench["photo"]["rows"]}
+        assert (
+            rows["mismatched_indices"]
+            < rows["carmine"]
+            < rows["channel_swap"]
+            < rows["opaque_fill"]
+            < rows["untrained_gan"]
+        )
+        assert rows["opaque_fill"] > rows["carmine"] * 2
+
     def test_meta_schema(self, bench):
         meta = bench["meta"]
         assert meta["n_images"] >= 20
@@ -236,7 +287,10 @@ class TestBenchmarkJsonSchema:
         assert isinstance(meta["skipped"], list)
         assert meta["smoothing_override"] == pytest.approx(0.0)
         assert isinstance(meta["smoothing_override_rationale"], str) and meta["smoothing_override_rationale"]
+        assert meta["finish_override"] == "satin"
+        assert isinstance(meta["finish_override_rationale"], str) and meta["finish_override_rationale"]
         assert isinstance(meta["lip_detail_retention_note"], str) and meta["lip_detail_retention_note"]
+        assert isinstance(meta["lip_luminance_shift_note"], str) and meta["lip_luminance_shift_note"]
 
         protocol = meta["protocol"]
         for key in (
@@ -245,6 +299,7 @@ class TestBenchmarkJsonSchema:
             "background_untouched",
             "lip_texture_kept",
             "lip_detail_retention",
+            "lip_luminance_shift",
             "identity_ssim",
         ):
             assert key in protocol
