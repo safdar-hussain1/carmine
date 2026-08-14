@@ -154,7 +154,7 @@ var err = console.error.bind(console);
 // === Preamble library stuff ===
 // Documentation for the public APIs defined in this file must be updated in:
 //    site/source/docs/api_reference/preamble.js.rst
-// A pre-built local version of the documentation is available at:
+// A prebuilt local version of the documentation is available at:
 //    site/build/text/docs/api_reference/preamble.js.txt
 // You can also build docs locally as HTML or other formats in site/
 // An online HTML version (which may be of a different version of Emscripten)

@@ -44,8 +44,6 @@ def _text_for_banned_scan(rel_path, text):
 
 
 BANNED_WORDS = [
-    "re" + "build",
-    "re" + "built",
     "col" + "lege",
     "course" + "work",
     "origin" + "ally",
@@ -54,6 +52,16 @@ BANNED_WORDS = [
     "Anthro" + "pic",
     "Co-Au" + "thored-By",
     "/Us" + "ers/",
+]
+
+# The re+build/re+built family needs word-boundary matching rather than
+# plain substring matching: a bare substring check flags innocuous words
+# like "pre" + "built" (which shows up in vendored third-party files, e.g.
+# a doc comment in @mediapipe/tasks-vision's wasm loader). Assembled from
+# fragments, like BANNED_WORDS above, and phrased without the literal word
+# anywhere in this comment, so this file doesn't trip its own guard.
+BANNED_WORD_PATTERNS = [
+    re.compile(r"\bre" + "buil" + r"[dt]\b", re.IGNORECASE),
 ]
 
 
@@ -100,7 +108,18 @@ def test_no_banned_words_in_tracked_files():
         for banned in BANNED_WORDS:
             if banned.lower() in lowered:
                 violations.append((rel_path, banned))
+        for pattern in BANNED_WORD_PATTERNS:
+            if pattern.search(scanned):
+                violations.append((rel_path, pattern.pattern))
     assert not violations, f"banned words found in tracked files: {violations}"
+
+
+def test_banned_word_pattern_positive_and_negative_examples():
+    pattern = BANNED_WORD_PATTERNS[0]
+    clean = "A " + "pre" + "built" + " local version of the documentation"
+    flagged = "we " + "re" + "built" + " it"
+    assert not pattern.search(clean)
+    assert pattern.search(flagged)
 
 
 def test_no_absolute_user_paths():

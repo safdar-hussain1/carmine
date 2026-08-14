@@ -11,6 +11,9 @@
 
 import { FaceLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
 
+// Only the SIMD wasm variant ships (no CDN fallback) -- WASM SIMD is
+// universal in browsers meeting our WebGL2 baseline, so pre-2021 browsers
+// (which would otherwise fall back to the nosimd variant) are unsupported.
 const WASM_BASE_PATH = "./wasm";
 
 export interface Landmarker {
