@@ -1,0 +1,74 @@
+{
+  "photo": {
+    "rows": [
+      {
+        "method": "mismatched_indices",
+        "pigment_on_target": 0.36884715519336403,
+        "background_untouched": 1.0,
+        "lip_texture_kept": 0.8196527982290754,
+        "identity_ssim": 0.9803227676136816,
+        "ms_per_image": 605.8013413790972
+      },
+      {
+        "method": "opaque_fill",
+        "pigment_on_target": 0.9976740352741,
+        "background_untouched": 1.0,
+        "lip_texture_kept": 0.9865316116225145,
+        "identity_ssim": 0.995519094273966,
+        "ms_per_image": 603.4790065470868
+      },
+      {
+        "method": "channel_swap",
+        "pigment_on_target": 0.14391160330486621,
+        "background_untouched": 0.016863761665336475,
+        "lip_texture_kept": 0.9721599686850866,
+        "identity_ssim": 0.9928948001642736,
+        "ms_per_image": 599.7506441512646
+      },
+      {
+        "method": "untrained_gan",
+        "pigment_on_target": 0.0868313830251841,
+        "background_untouched": 3.2957939266239505e-07,
+        "lip_texture_kept": -0.2302168368260809,
+        "identity_ssim": 0.5870585600590303,
+        "ms_per_image": 598.1910720315332
+      },
+      {
+        "method": "carmine",
+        "pigment_on_target": 0.8287126874832297,
+        "background_untouched": 1.0,
+        "lip_texture_kept": 0.983741692257315,
+        "identity_ssim": 0.9981173975998409,
+        "ms_per_image": 599.3537692523275
+      }
+    ]
+  },
+  "meta": {
+    "n_images": 26,
+    "skipped": [],
+    "look_preset": "velvet",
+    "protocol": {
+      "pigment_on_target": "fraction of total pixel-change energy that falls inside the union of the lip, eyeshadow, blush, and eyeliner masks (threshold 0.05)",
+      "background_untouched": "fraction of pixels outside a dilated face-hull mask that are bit-identical between input and output",
+      "lip_texture_kept": "Pearson correlation of Lab-L lightness inside the lip mask (threshold 0.5), before vs after",
+      "identity_ssim": "grayscale structural similarity of output vs input, whole image"
+    }
+  },
+  "stability": {
+    "raw": {
+      "mean_iou": 0.8063002563485118,
+      "centroid_drift": 0.01657908254028023
+    },
+    "one_euro": {
+      "mean_iou": 0.8211953006113991,
+      "centroid_drift": 0.014708122397468692
+    },
+    "improvement_pct": {
+      "mean_iou": 1.8473321998361336,
+      "centroid_drift": 11.28506440730895
+    },
+    "video_ms_per_frame": 72.14787550037727,
+    "n_frames": 90,
+    "n_frames_with_face": 90
+  }
+}
