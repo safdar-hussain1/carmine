@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "carmine"
+version = "1.0.0"
+description = "Texture-preserving virtual makeup engine with a real-time browser mirror"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Safdar Hussain" }]
+dependencies = [
+    "opencv-python>=4.9,<5",
+    "opencv-contrib-python<5",
+    "mediapipe>=0.10.30",
+    "numpy",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "scikit-image"]
+bench = ["dlib"]
+
+[project.scripts]
+carmine = "carmine.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
