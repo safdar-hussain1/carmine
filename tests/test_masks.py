@@ -167,4 +167,12 @@ class TestEyeshadowCreaseGradient:
                 max(crease_row - 2, 0) : crease_row + 3, x_min:x_max
             ]
             assert near_lash.size > 0 and near_crease.size > 0
-            assert near_lash.mean() > near_crease.mean()
+            ratio = near_lash.mean() / near_crease.mean()
+            # Feathering alone (no crease gradient) already makes the lash
+            # row brighter than the crease row because the lash row sits
+            # deeper inside the polygon -- measured ratio ~1.3 with the
+            # gradient removed. With the 1.0 -> 0.35 crease gradient
+            # applied, the measured ratio is ~1.7. Threshold at 1.5 sits
+            # between the two so this test actually fails if the gradient
+            # is removed, instead of passing on feather falloff alone.
+            assert ratio >= 1.5, f"lash/crease ratio {ratio} too low for a crease gradient"

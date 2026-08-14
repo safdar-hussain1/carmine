@@ -107,7 +107,7 @@ def eyeshadow_mask(landmarks: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
 
 
 def eyeliner_mask(landmarks: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
-    """Thin line along each upper lash line with a small outer wing."""
+    """A narrow stroke traced along each upper lash line, winged at the corner."""
     iod = interocular_distance(landmarks)
     thickness = max(1, int(round(iod * 0.012)))
     mask = np.zeros(shape, dtype=np.float32)
@@ -133,10 +133,11 @@ def eyeliner_mask(landmarks: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
 
 
 def blush_mask(landmarks: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
-    """Soft ellipse on each mid-cheek, axes scaled to the face.
+    """A feathered ellipse centered on each cheek, sized relative to the face.
 
-    Clipped to the face oval so the feathered falloff cannot bleed onto
-    hair or background at the cheek silhouette.
+    Multiplying by a feathered face-oval mask keeps the ellipse's soft
+    edge from spilling onto hair or the background near the jawline,
+    which a plain ellipse fill would not prevent.
     """
     iod = interocular_distance(landmarks)
     axes = (int(round(iod * 0.20)), int(round(iod * 0.14)))
