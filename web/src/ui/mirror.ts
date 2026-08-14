@@ -97,7 +97,10 @@ export function createMirror(options: MirrorOptions): Mirror {
   hud.append(hudDot, hudText);
 
   const panel = el("div", "stage__panel");
-  const panelMark = el("p", "stage__mark", "Carmine");
+  // Not the wordmark again -- the masthead already carries "Carmine". This
+  // is the quieter glyph alone, so the stage reads as a compact's mirror
+  // rather than a second logo lockup.
+  const panelMark = el("div", "stage__mark", ICONS.lipmark);
   const panelClaim = el(
     "p",
     "stage__claim",
@@ -226,7 +229,10 @@ export function createMirror(options: MirrorOptions): Mirror {
       link.href = url;
       link.download = `carmine-${Date.now()}.png`;
       link.click();
-      URL.revokeObjectURL(url);
+      // Firefox and Safari can abort the download if the object URL is
+      // revoked before the save dialog has read it; a synchronous revoke
+      // right after click() races that. Defer well past any such window.
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
     }, "image/png");
   }
 

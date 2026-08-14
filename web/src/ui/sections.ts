@@ -145,8 +145,8 @@ export function howItWorksHtml(): string {
   const steps = STEPS.map(
     (step, index) => `
     <article class="step">
-      <p class="step__num">${String(index + 1).padStart(2, "0")}</p>
       <div class="step__art">${step.art}</div>
+      <p class="step__num">${String(index + 1).padStart(2, "0")}</p>
       <h3>${step.title}</h3>
       <p>${step.body}</p>
     </article>`,

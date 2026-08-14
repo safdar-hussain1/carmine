@@ -27,7 +27,17 @@ let landmarkerPromise: Promise<Landmarker> | null = null;
  */
 export function sharedLandmarker(): Promise<Landmarker> {
   if (landmarkerPromise === null) {
-    landmarkerPromise = createLandmarker(MODEL_URL);
+    const promise = createLandmarker(MODEL_URL).catch((error: unknown) => {
+      // Don't cache a rejected promise forever: a transient failure (a slow
+      // network on first load, a WASM instantiation hiccup) would otherwise
+      // wedge every future caller behind the same dead promise. Clear it so
+      // the next call retries from scratch.
+      if (landmarkerPromise === promise) {
+        landmarkerPromise = null;
+      }
+      throw error;
+    });
+    landmarkerPromise = promise;
   }
   return landmarkerPromise;
 }

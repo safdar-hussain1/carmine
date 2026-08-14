@@ -40,6 +40,7 @@
 
   --stage-bg: #241819;
   --stage-ink: #f3e7e4;
+  --stage-line: var(--line-strong);
 
   --font-display: Didot, "Bodoni MT", "Playfair Display", "Times New Roman", Georgia, serif;
   --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
@@ -80,9 +81,17 @@
     --ink-3: #8b7876;
     --line: #2c2122;
     --line-strong: #443334;
-    --neutral-bar: #6d5b5b;
+    /* Lifted from #6d5b5b (2.7:1 on --surface-2) so a short bar -- one of a
+       few pixels wide, e.g. a 0.087 value -- still separates from its
+       track rather than reading as empty. */
+    --neutral-bar: #8f7a79;
     --stage-bg: #0a0708;
     --stage-ink: #f3e7e4;
+    /* --line-strong (#443334) sits at ~1.65:1 against both --bg and
+       --stage-bg here -- on a near-black ground the stage's own rim needs
+       a value brighter than the page-wide line colour or it disappears
+       entirely, and the stage stops reading as a panel. */
+    --stage-line: #6b5456;
   }
 }
 
@@ -100,9 +109,10 @@
   --ink-3: #8b7876;
   --line: #2c2122;
   --line-strong: #443334;
-  --neutral-bar: #6d5b5b;
+  --neutral-bar: #8f7a79;
   --stage-bg: #0a0708;
   --stage-ink: #f3e7e4;
+  --stage-line: #6b5456;
 }
 
 *,
@@ -356,8 +366,15 @@ dl {
 }
 
 .hero__head {
-  max-width: 40rem;
   margin-bottom: clamp(1.5rem, 3vw, 2.25rem);
+}
+
+/* Same fix as .section__head just above: this cap is for narrow viewports
+   only, so it stops cancelling the >=64rem grid override's max-width: none. */
+@media (max-width: 63.9375rem) {
+  .hero__head {
+    max-width: 40rem;
+  }
 }
 
 .hero h1 {
@@ -397,7 +414,7 @@ dl {
   overflow: hidden;
   background: var(--stage-bg);
   color: var(--stage-ink);
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--stage-line);
   box-shadow: 0 0 0 1px var(--bg) inset, 0 1px 2px rgba(23, 16, 15, 0.06),
     0 18px 40px -24px rgba(23, 16, 15, 0.5);
 }
@@ -455,11 +472,22 @@ dl {
   display: none;
 }
 
+/* Normally an unlabelled glyph -- the masthead already carries the
+   wordmark. The denied/unsupported states repurpose this same slot for a
+   short headline ("No camera", "No WebGL2 here"), so the text sizing stays
+   defined here too. */
 .stage__mark {
   font-family: var(--font-display);
   font-size: clamp(2.25rem, 5vw, 3.5rem);
   line-height: 1;
   letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--stage-ink) 85%, transparent);
+}
+
+.stage__mark svg {
+  width: clamp(2.25rem, 5vw, 3rem);
+  height: clamp(2.25rem, 5vw, 3rem);
+  stroke: var(--carmine);
 }
 
 .stage__claim {
@@ -990,8 +1018,21 @@ dl {
 }
 
 .section__head {
-  max-width: 46rem;
   margin-bottom: clamp(2rem, 4vw, 3rem);
+}
+
+/* The 46rem measure is a narrow-viewport cap, not a permanent one -- it used
+   to sit in an unqualified rule declared *after* the >=64rem grid override
+   above, so the cascade let it win everywhere and quietly cancelled that
+   override's `max-width: none`. The result: the head (and the eyebrow rule
+   inside it, which fills the head's own width) topped out at 736px even on
+   a 1440px canvas, well short of the grid every other section in this
+   layout uses. Scoping the cap below the grid's own breakpoint lets the
+   desktop override apply as designed. */
+@media (max-width: 63.9375rem) {
+  .section__head {
+    max-width: 46rem;
+  }
 }
 
 .section__head h2 {
@@ -1007,12 +1048,18 @@ dl {
   gap: clamp(1.5rem, 3vw, 2.5rem);
 }
 
+/* Sits directly above its title now, not above the illustration -- the
+   numeral is labelling the step, not the artwork, so the gap to the title
+   is the one that should read as tight. Weight is bumped up (the mono
+   face is thin at this size) so the numeral holds its own against carmine
+   headline type rather than reading as a faint caption. */
 .step__num {
   font-family: var(--font-mono);
   font-size: var(--step--2);
+  font-weight: 600;
   letter-spacing: 0.16em;
   color: var(--carmine);
-  margin-bottom: 0.75rem;
+  margin: 0 0 0.3rem;
 }
 
 .step__art {

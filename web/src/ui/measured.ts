@@ -253,6 +253,7 @@ function stabilityChart(): string {
 function protocolList(): string {
   const protocol = benchmark.meta.protocol as unknown as Record<string, string>;
   return Object.entries(protocol)
+    .filter(([key]) => !key.endsWith("_caveat"))
     .map(([key, text]) => `<dt>${key.replace(/_/g, " ")}</dt><dd>${text}</dd>`)
     .join("");
 }

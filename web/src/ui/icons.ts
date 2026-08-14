@@ -21,4 +21,10 @@ export const ICONS = {
   sun: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.2 5.2l1.4 1.4M17.4 17.4l1.4 1.4M18.8 5.2l-1.4 1.4M6.6 17.4l-1.4 1.4"/>'),
   moon: svg('<path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a8.5 8.5 0 1 0 10.2 10.2Z"/>'),
   grip: svg('<path d="M9.5 8 6 12l3.5 4"/><path d="m14.5 8 3.5 4-3.5 4"/>'),
+  /** A single lip curve -- the quiet, unlabelled version of the mark. Used
+   *  inside the stage, where the masthead already carries the wordmark and
+   *  a second "Carmine" would just be noise. */
+  lipmark: svg(
+    '<path d="M4 12.3c1.8-2.5 4.1-3.8 6.3-3.9.6-.6 1.5-.6 2.1 0 2.2.1 4.5 1.4 6.3 3.9-1.2 2.7-4.3 4.5-7.35 4.5S5.2 15 4 12.3Z"/><path d="M4 12.3c2.35 1 5.05 1.6 7.35 1.6s5-.6 7.35-1.6"/>',
+  ),
 } as const;
