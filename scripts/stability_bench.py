@@ -41,6 +41,15 @@ drift) still exists and is still unit-tested on constructed cases, but this
 script does not use it for publishing -- it has the same "rewards lag"
 blind spot as raw IoU jitter would, for the same reason.
 
+Two One-Euro configurations are published, not one: `one_euro_best_tuned`
+(the grid-search winner, adopted as `VideoEngine`'s defaults only if it
+clears the 20% jitter-reduction bar) and `one_euro_shipped_defaults` (the
+literal current `OneEuroFilter()` default parameters' own row in the same
+grid). They can differ -- the grid search minimizing jitter doesn't
+necessarily land on whatever's already shipped, and on this clip the two
+tell different stories, which is exactly why both are reported rather than
+just the flattering one.
+
 Usage:
     python scripts/stability_bench.py --out reports
 """
@@ -90,6 +99,16 @@ MIN_CUTOFF_VALUES = [0.5, 1.0, 1.5]
 BETA_VALUES = [0.007, 0.05, 0.2, 0.5]
 DEVIATION_CONSTRAINT_MULTIPLIER = 1.5
 IMPROVEMENT_THRESHOLD_PCT = 20.0
+
+# OneEuroFilter's actual shipped defaults, read from the class itself (not
+# hard-coded) so this can't silently drift out of sync with carmine/filters.py.
+# Must be a point already covered by the grid above.
+_shipped_defaults = OneEuroFilter()
+SHIPPED_MIN_CUTOFF = _shipped_defaults.min_cutoff
+SHIPPED_BETA = _shipped_defaults.beta
+assert SHIPPED_MIN_CUTOFF in MIN_CUTOFF_VALUES and SHIPPED_BETA in BETA_VALUES, (
+    "OneEuroFilter's shipped defaults must be one of the grid-searched points"
+)
 
 
 def _affine_params(t: float, width: int) -> tuple[float, float, float]:
@@ -291,15 +310,54 @@ def main() -> int:
 
     video_ms_per_frame = measure_video_ms_per_frame(frames)
 
+    # `OneEuroFilter`'s actual shipped defaults (see carmine/filters.py) are a
+    # specific point in the same grid we already searched -- surface its own
+    # row explicitly rather than only the best-tuned one, since "one_euro"
+    # unqualified would otherwise read as "what VideoEngine does today",
+    # which the grid-search winner is not.
+    shipped_row = next(
+        g for g in grid_results if g["min_cutoff"] == SHIPPED_MIN_CUTOFF and g["beta"] == SHIPPED_BETA
+    )
+    shipped_deviation_ratio = (
+        shipped_row["deviation_px_iod"] / raw_deviation if raw_deviation > 0 else float("inf")
+    )
+    shipped_jitter_change_pct = (
+        (shipped_row["jitter_px_iod"] - raw_jitter) / raw_jitter * 100.0 if raw_jitter > 0 else 0.0
+    )
+    note += (
+        f" For comparison, OneEuroFilter's actual shipped defaults "
+        f"(min_cutoff={SHIPPED_MIN_CUTOFF}, beta={SHIPPED_BETA}) are worse than doing nothing on "
+        f"this clip: deviation {shipped_deviation_ratio:.1f}x raw, jitter "
+        f"{shipped_jitter_change_pct:+.0f}% vs raw. Smoothing is therefore most useful as an "
+        "opt-in for genuinely jittery cameras, not a free win applied blindly -- on a clip this "
+        "clean, the shipped defaults actively hurt tracking accuracy."
+    )
+
+    ground_truth_caveat = (
+        "ground truth is itself anchored to a real (noisy) frame-0 detection, not a synthetic "
+        "exact position, so the absolute deviation_px_iod numbers above are mildly optimistic "
+        "(frame 0's own detection error isn't counted against anyone); the raw-vs-filtered "
+        "comparison is still fair since every stream shares the same frame-0 anchor."
+    )
+
     stability = {
         "protocol": "ground_truth_affine",
+        "ground_truth_caveat": ground_truth_caveat,
         "raw": {"deviation_px_iod": raw_deviation, "jitter_px_iod": raw_jitter},
-        "one_euro": {
+        "one_euro_best_tuned": {
             "deviation_px_iod": chosen["deviation_px_iod"],
             "jitter_px_iod": chosen["jitter_px_iod"],
             "min_cutoff": chosen["min_cutoff"],
             "beta": chosen["beta"],
             "meets_deviation_constraint": chosen_satisfies_constraint,
+        },
+        "one_euro_shipped_defaults": {
+            "deviation_px_iod": shipped_row["deviation_px_iod"],
+            "jitter_px_iod": shipped_row["jitter_px_iod"],
+            "min_cutoff": SHIPPED_MIN_CUTOFF,
+            "beta": SHIPPED_BETA,
+            "deviation_ratio_vs_raw": shipped_deviation_ratio,
+            "jitter_change_pct_vs_raw": shipped_jitter_change_pct,
         },
         "grid_search": {
             "min_cutoff_values": MIN_CUTOFF_VALUES,
@@ -332,13 +390,19 @@ def main() -> int:
     out_json.write_text(json.dumps(result, indent=2))
     print(f"\nwrote {out_json}")
 
-    print(f"\nraw:      deviation {raw_deviation:.4f} px/iod, jitter {raw_jitter:.4f} px/iod")
+    print(f"\nraw:                    deviation {raw_deviation:.4f} px/iod, jitter {raw_jitter:.4f} px/iod")
     print(
-        f"one_euro: deviation {chosen['deviation_px_iod']:.4f} px/iod, "
+        f"one_euro_best_tuned:    deviation {chosen['deviation_px_iod']:.4f} px/iod, "
         f"jitter {chosen['jitter_px_iod']:.4f} px/iod "
         f"(min_cutoff={chosen['min_cutoff']}, beta={chosen['beta']})"
     )
-    print(f"jitter reduction: {jitter_reduction_pct:+.1f}%  (>= {IMPROVEMENT_THRESHOLD_PCT:.0f}% required to adopt)")
+    print(
+        f"one_euro_shipped_defaults: deviation {shipped_row['deviation_px_iod']:.4f} px/iod "
+        f"({shipped_deviation_ratio:.1f}x raw), jitter {shipped_row['jitter_px_iod']:.4f} px/iod "
+        f"({shipped_jitter_change_pct:+.0f}% vs raw) "
+        f"(min_cutoff={SHIPPED_MIN_CUTOFF}, beta={SHIPPED_BETA})"
+    )
+    print(f"jitter reduction (best tuned): {jitter_reduction_pct:+.1f}%  (>= {IMPROVEMENT_THRESHOLD_PCT:.0f}% required to adopt)")
     print(note)
     print(f"video ms/frame (median): {video_ms_per_frame:.2f}")
     return 0

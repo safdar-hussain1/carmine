@@ -198,7 +198,11 @@ def lip_detail_retention(before: np.ndarray, after: np.ndarray, lip_mask: np.nda
         possible if a method adds noise/contrast rather than removing it.
 
     Raises:
-        ValueError: If `lip_mask` selects no pixels.
+        ValueError: If `lip_mask` selects no pixels, or if `before` has no
+            measurable high-frequency detail inside the mask to begin with
+            (a degenerate, already-flat region) -- the ratio is undefined
+            when there's nothing to retain, so this raises rather than
+            silently returning a value that looks like a real measurement.
     """
     after = _resize_to_match(before, after)
     inside = np.asarray(lip_mask) > 0.5
@@ -208,7 +212,11 @@ def lip_detail_retention(before: np.ndarray, after: np.ndarray, lip_mask: np.nda
     detail_after = _highpass_l(after)[inside]
     std_before = float(detail_before.std())
     if std_before < 1e-6:
-        return 0.0 if float(detail_after.std()) < 1e-6 else float("inf")
+        raise ValueError(
+            "before has no measurable high-frequency detail inside lip_mask "
+            f"(std={std_before:.2e}); lip_detail_retention is undefined for a "
+            "degenerate, already-flat input region"
+        )
     return float(detail_after.std() / std_before)
 
 

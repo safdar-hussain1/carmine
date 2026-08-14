@@ -22,6 +22,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from skimage import data  # noqa: E402
 
@@ -29,6 +30,8 @@ from carmine import baselines, regions  # noqa: E402
 from carmine.engine import apply_look  # noqa: E402
 from carmine.landmarks import FaceLandmarker  # noqa: E402
 from carmine.look import PRESETS  # noqa: E402
+
+from benchmark import benchmark_look  # noqa: E402
 
 FIGDIR = ROOT / "reports" / "figures"
 
@@ -52,19 +55,25 @@ LABELS = {
     "untrained_gan": "Untrained GAN",
     "carmine": "This engine",
 }
+# Order: the two containment metrics first, then lip_luminance_shift in the
+# primary (top-right) slot -- it's the metric that actually distinguishes a
+# hard fill from a soft tint by magnitude, not just direction -- followed by
+# the two blind-spot-prone/diagnostic metrics and identity last.
 METRICS = [
     "pigment_on_target",
     "background_untouched",
+    "lip_luminance_shift",
     "lip_texture_kept",
     "lip_detail_retention",
-    "lip_luminance_shift",
     "identity_ssim",
 ]
 METRIC_TITLES = {
     "pigment_on_target": "Edit energy inside legitimate product regions",
     "background_untouched": "Background pixels left bit-identical",
     "lip_texture_kept": "Lip texture preserved (lightness corr.)",
-    "lip_detail_retention": "Lip high-freq. detail retained (after / before)",
+    "lip_detail_retention": (
+        "Lip detail ratio (diagnostic -- additive fills\npreserve highpass until saturation)"
+    ),
     "lip_luminance_shift": "Lip brightness shift, |ΔL| (lower is better)",
     "identity_ssim": "Identity SSIM vs input",
 }
@@ -157,7 +166,11 @@ def fig_presets_demo(landmarker: FaceLandmarker) -> None:
 
 
 def fig_opacity_compare(landmarker: FaceLandmarker) -> None:
-    """Lip-region crops: original vs carmine vs opaque_fill, same velvet look.
+    """Lip-region crops: original vs carmine vs opaque_fill, the exact
+    benchmarked configuration (velvet + lipstick finish forced to satin +
+    smoothing forced to 0 -- see `benchmark_look()`), so this figure shows
+    the same setup the `lip_detail_retention` / `lip_luminance_shift`
+    numbers were measured under, not a look that merely looks similar.
 
     `pigment_on_target` and `lip_texture_kept` can't tell a hard fill from a
     soft tint when both share the same, correctly-indexed lip region (see
@@ -167,7 +180,7 @@ def fig_opacity_compare(landmarker: FaceLandmarker) -> None:
     """
     astro = cv2.cvtColor(data.astronaut(), cv2.COLOR_RGB2BGR)
     lm = landmarker.detect(astro)
-    look = PRESETS["velvet"]
+    look = benchmark_look()
 
     carmine_out = apply_look(astro, look, landmarks=lm)
     opaque_out = baselines.opaque_fill(astro, lm, look)
@@ -190,18 +203,18 @@ def fig_opacity_compare(landmarker: FaceLandmarker) -> None:
         tile = crop(img)
         h, w = tile.shape[:2]
         tiles.append(cv2.resize(tile, (int(w * height / h), height), interpolation=cv2.INTER_NEAREST))
-    titles = ["original", "carmine (velvet)", "opaque_fill (velvet)"]
+    titles = ["original", "carmine (velvet, satin lipstick)", "opaque_fill (velvet, satin lipstick)"]
 
-    fig, axes = plt.subplots(1, 3, figsize=(3.4 * 3, 3.8))
+    fig, axes = plt.subplots(1, 3, figsize=(3.4 * 3, 2.5))
     for ax, tile, title in zip(axes, tiles, titles):
         ax.imshow(cv2.cvtColor(tile, cv2.COLOR_BGR2RGB))
         ax.set_title(title, fontsize=10, color=INK)
         ax.axis("off")
     fig.suptitle(
-        "Same lip region, same look -- hard fill vs texture-preserving tint",
+        "Same lip region, same benchmarked look -- hard fill vs texture-preserving tint",
         fontsize=10.5,
         color=INK,
-        y=1.03,
+        y=1.02,
     )
     fig.tight_layout()
     fig.savefig(FIGDIR / "opacity_compare.png", bbox_inches="tight")

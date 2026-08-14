@@ -112,6 +112,16 @@ class TestLipDetailRetention:
         with pytest.raises(ValueError):
             metrics.lip_detail_retention(before, before.copy(), np.zeros((10, 10), dtype=np.float32))
 
+    def test_degenerate_flat_before_raises(self):
+        # A before-image with no high-frequency detail at all inside the
+        # mask makes the ratio undefined (0/0-shaped), so this should raise
+        # rather than silently return 0.0 or inf.
+        before = _flat_image((20, 20), (100, 100, 100))
+        mask = np.ones((20, 20), dtype=np.float32)
+        after = _textured_patch((20, 20), seed=42)
+        with pytest.raises(ValueError):
+            metrics.lip_detail_retention(before, after, mask)
+
 
 class TestLipLuminanceShift:
     def test_no_change_scores_zero(self):
@@ -308,13 +318,25 @@ class TestBenchmarkJsonSchema:
     def test_stability_section_schema(self, bench):
         stability = bench["stability"]
         assert stability["protocol"] == "ground_truth_affine"
+        assert isinstance(stability["ground_truth_caveat"], str) and stability["ground_truth_caveat"]
 
-        for variant in ("raw", "one_euro"):
+        for variant in ("raw", "one_euro_best_tuned", "one_euro_shipped_defaults"):
             entry = stability[variant]
             assert np.isfinite(entry["deviation_px_iod"])
             assert entry["deviation_px_iod"] >= 0.0
             assert np.isfinite(entry["jitter_px_iod"])
             assert entry["jitter_px_iod"] >= 0.0
+
+        shipped = stability["one_euro_shipped_defaults"]
+        assert np.isfinite(shipped["deviation_ratio_vs_raw"])
+        assert np.isfinite(shipped["jitter_change_pct_vs_raw"])
+        # Pins the actual measured reality this fix surfaced: the shipped
+        # OneEuroFilter defaults are worse than doing nothing on this clip.
+        # If a future change makes them genuinely better, this assertion
+        # (and the note text) need to be revisited deliberately, not just
+        # deleted to make the suite pass.
+        assert shipped["deviation_ratio_vs_raw"] > 1.0
+        assert shipped["jitter_change_pct_vs_raw"] > 0.0
 
         grid = stability["grid_search"]
         expected_n = len(grid["min_cutoff_values"]) * len(grid["beta_values"])
@@ -336,6 +358,7 @@ class TestBenchmarkJsonSchema:
 
         assert np.isfinite(stability["jitter_reduction_pct"])
         assert isinstance(stability["note"], str) and stability["note"]
+        assert "shipped defaults" in stability["note"]
         assert np.isfinite(stability["video_ms_per_frame"])
         assert stability["video_ms_per_frame"] > 0.0
         assert stability["n_frames_with_face"] >= 2

@@ -190,6 +190,21 @@ def _method_thunks(image: np.ndarray, landmarks: np.ndarray, look):
     }
 
 
+def benchmark_look():
+    """The exact `Look` every method is scored under: velvet, with lipstick
+    finish forced to satin and smoothing forced to 0 (see meta.finish_override
+    / meta.smoothing_override in the written JSON for the rationale). Shared
+    with `make_figures.py` so the opacity-comparison figure shows the same
+    configuration the numbers were measured under, not a look that merely
+    looks similar.
+    """
+    return dataclasses.replace(
+        PRESETS["velvet"],
+        lipstick=dataclasses.replace(PRESETS["velvet"].lipstick, finish="satin"),
+        smoothing=0.0,
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", type=Path, default=ROOT / "data" / "no_makeup")
@@ -203,11 +218,7 @@ def main() -> int:
         parser.error(f"dataset directory not found: {args.dataset}")
 
     landmarker = FaceLandmarker()
-    benchmark_look = dataclasses.replace(
-        PRESETS["velvet"],
-        lipstick=dataclasses.replace(PRESETS["velvet"].lipstick, finish="satin"),
-        smoothing=0.0,
-    )
+    look = benchmark_look()
 
     per_image: dict[str, list[dict]] = {m: [] for m in METHODS}
     runtimes: dict[str, list[float]] = {m: [] for m in METHODS}
@@ -229,7 +240,7 @@ def main() -> int:
             skipped.append({"name": path.name, "reason": "no face detected"})
             continue
 
-        thunks = _method_thunks(image, landmarks, benchmark_look)
+        thunks = _method_thunks(image, landmarks, look)
         for method in METHODS:
             t0 = time.perf_counter()
             out = thunks[method]()

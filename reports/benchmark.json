@@ -1,16 +1,25 @@
 {
   "stability": {
     "protocol": "ground_truth_affine",
+    "ground_truth_caveat": "ground truth is itself anchored to a real (noisy) frame-0 detection, not a synthetic exact position, so the absolute deviation_px_iod numbers above are mildly optimistic (frame 0's own detection error isn't counted against anyone); the raw-vs-filtered comparison is still fair since every stream shares the same frame-0 anchor.",
     "raw": {
       "deviation_px_iod": 0.011313962765030666,
       "jitter_px_iod": 0.0024564776401140324
     },
-    "one_euro": {
+    "one_euro_best_tuned": {
       "deviation_px_iod": 0.015526284545136187,
       "jitter_px_iod": 0.002270855562476886,
       "min_cutoff": 1.5,
       "beta": 0.5,
       "meets_deviation_constraint": true
+    },
+    "one_euro_shipped_defaults": {
+      "deviation_px_iod": 0.05198791143501865,
+      "jitter_px_iod": 0.004257903320742268,
+      "min_cutoff": 1.0,
+      "beta": 0.007,
+      "deviation_ratio_vs_raw": 4.59502232018153,
+      "jitter_change_pct_vs_raw": 73.33368931233633
     },
     "grid_search": {
       "min_cutoff_values": [
@@ -116,8 +125,8 @@
     "selected_params": null,
     "jitter_reduction_pct": 7.556432617417588,
     "meets_improvement_threshold": false,
-    "note": "one_euro shows no measurable benefit on this clip: the best constraint-satisfying config (min_cutoff=1.5, beta=0.5) only reduced motion-compensated jitter by 7.6% (< 20% threshold). VideoEngine defaults left unchanged.",
-    "video_ms_per_frame": 75.84629202028736,
+    "note": "one_euro shows no measurable benefit on this clip: the best constraint-satisfying config (min_cutoff=1.5, beta=0.5) only reduced motion-compensated jitter by 7.6% (< 20% threshold). VideoEngine defaults left unchanged. For comparison, OneEuroFilter's actual shipped defaults (min_cutoff=1.0, beta=0.007) are worse than doing nothing on this clip: deviation 4.6x raw, jitter +73% vs raw. Smoothing is therefore most useful as an opt-in for genuinely jittery cameras, not a free win applied blindly -- on a clip this clean, the shipped defaults actively hurt tracking accuracy.",
+    "video_ms_per_frame": 74.91020852467045,
     "n_frames": 90,
     "n_frames_with_face": 90,
     "clip_params": {
@@ -139,7 +148,7 @@
         "lip_detail_retention": 1.360194832086563,
         "lip_luminance_shift": 3.847041447821195,
         "identity_ssim": 0.9803227676136816,
-        "ms_per_image": 5.478557655945993,
+        "ms_per_image": 5.218009576380539,
         "spread": {
           "pigment_on_target": [
             0.2609793164138465,
@@ -166,8 +175,8 @@
             0.9880043848343832
           ],
           "ms_per_image": [
-            3.4624580293893814,
-            6.580875022336841
+            3.2070419983938336,
+            6.168500054627657
           ]
         }
       },
@@ -179,7 +188,7 @@
         "lip_detail_retention": 0.9523712488321158,
         "lip_luminance_shift": 45.655138257824355,
         "identity_ssim": 0.995519094273966,
-        "ms_per_image": 10.933476025596834,
+        "ms_per_image": 11.178376600862695,
         "spread": {
           "pigment_on_target": [
             0.9706011358024464,
@@ -206,8 +215,8 @@
             0.9972693154892525
           ],
           "ms_per_image": [
-            7.812583935447037,
-            17.565708025358617
+            7.857291959226131,
+            31.45837492775172
           ]
         }
       },
@@ -219,7 +228,7 @@
         "lip_detail_retention": 0.8012324938407311,
         "lip_luminance_shift": 31.26909159354934,
         "identity_ssim": 0.9930330696510468,
-        "ms_per_image": 239.45771148786523,
+        "ms_per_image": 226.52955279381086,
         "spread": {
           "pigment_on_target": [
             0.06610867588897189,
@@ -246,8 +255,8 @@
             0.9962128525556343
           ],
           "ms_per_image": [
-            137.94916705228388,
-            275.82158299628645
+            135.0109160412103,
+            251.6023749485612
           ]
         }
       },
@@ -259,7 +268,7 @@
         "lip_detail_retention": 0.3682517288969113,
         "lip_luminance_shift": 87.49563642795573,
         "identity_ssim": 0.5870585600590303,
-        "ms_per_image": 41.64503689837427,
+        "ms_per_image": 38.12808495534297,
         "spread": {
           "pigment_on_target": [
             0.044212023012314645,
@@ -286,8 +295,8 @@
             0.7418046729077371
           ],
           "ms_per_image": [
-            35.146874957717955,
-            66.96762493811548
+            35.09512497112155,
+            51.87729198951274
           ]
         }
       },
@@ -299,7 +308,7 @@
         "lip_detail_retention": 0.7544177954013531,
         "lip_luminance_shift": 13.169222217017445,
         "identity_ssim": 0.9982793177706556,
-        "ms_per_image": 237.58990538324446,
+        "ms_per_image": 234.48483164135652,
         "spread": {
           "pigment_on_target": [
             0.7652969764654103,
@@ -326,8 +335,8 @@
             0.9993413735549183
           ],
           "ms_per_image": [
-            137.8172910772264,
-            276.72329102642834
+            135.22987510077655,
+            423.7171249696985
           ]
         }
       }
