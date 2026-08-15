@@ -22,8 +22,10 @@
 import constants from "../gen/constants.json";
 
 export interface OneEuroParams {
-  /** Sampling frequency in Hz. Only seeds the first estimate; every later
-   * call derives its frequency from the actual timestamp delta. */
+  /** Sampling frequency in Hz. Accepted for interface completeness (it
+   * mirrors the Python reference constructor); unused by the filter math --
+   * every call, including the first, derives its frequency from the actual
+   * timestamp delta. */
   freq: number;
   /** Baseline cutoff. Lower damps a still signal harder. */
   minCutoff: number;

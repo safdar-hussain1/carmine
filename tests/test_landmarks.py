@@ -2,9 +2,12 @@
 
 import hashlib
 import os
+from pathlib import Path
 
 import numpy as np
 import pytest
+
+import urllib.error
 
 from carmine.landmarks import (
     FaceLandmarker,
@@ -14,6 +17,7 @@ from carmine.landmarks import (
     _CHECKSUM,
     _verify_checksum,
 )
+from carmine import landmarks as landmarks_module
 from carmine.regions import NUM_LANDMARKS
 
 
@@ -90,6 +94,76 @@ class TestModelPath:
         monkeypatch.setenv("CARMINE_MODEL", str(override))
         result = model_path()
         assert result == override
+
+    def test_wrong_bytes_from_download_raise_and_leave_no_cache_file(
+        self, tmp_path, monkeypatch
+    ):
+        """Verify-then-promote: a download that writes the wrong bytes must
+        fail the checksum *before* anything is renamed into the cache path,
+        so the cache path is never left holding a bad/unverified file."""
+        fake_cache = tmp_path / "cache" / "face_landmarker.task"
+        monkeypatch.delenv("CARMINE_MODEL", raising=False)
+        monkeypatch.setattr(landmarks_module, "_CACHE_PATH", fake_cache)
+
+        def fake_urlretrieve(url, filename):
+            Path(filename).write_bytes(b"totally not the model")
+
+        monkeypatch.setattr(
+            landmarks_module.urllib.request, "urlretrieve", fake_urlretrieve
+        )
+
+        with pytest.raises(RuntimeError, match="checksum"):
+            model_path()
+
+        assert not fake_cache.exists()
+        assert not fake_cache.with_suffix(".task.tmp").exists()
+
+    def test_download_failure_is_wrapped_in_a_clear_runtime_error(
+        self, tmp_path, monkeypatch
+    ):
+        """A network/OS-level failure during download must not propagate as
+        a bare urllib exception -- it should become a RuntimeError naming
+        the model URL, the cache path, and the CARMINE_MODEL override, so
+        the CLI's `error: ...` contract can report it in one line."""
+        fake_cache = tmp_path / "cache" / "face_landmarker.task"
+        monkeypatch.delenv("CARMINE_MODEL", raising=False)
+        monkeypatch.setattr(landmarks_module, "_CACHE_PATH", fake_cache)
+
+        def fake_urlretrieve(url, filename):
+            raise urllib.error.URLError("simulated network failure")
+
+        monkeypatch.setattr(
+            landmarks_module.urllib.request, "urlretrieve", fake_urlretrieve
+        )
+
+        with pytest.raises(RuntimeError) as exc_info:
+            model_path()
+
+        message = str(exc_info.value)
+        assert landmarks_module._MODEL_URL in message
+        assert str(fake_cache) in message
+        assert "CARMINE_MODEL" in message
+        assert not fake_cache.exists()
+        assert not fake_cache.with_suffix(".task.tmp").exists()
+
+    def test_ssl_download_failure_mentions_install_certificates(
+        self, tmp_path, monkeypatch
+    ):
+        import ssl
+
+        fake_cache = tmp_path / "cache" / "face_landmarker.task"
+        monkeypatch.delenv("CARMINE_MODEL", raising=False)
+        monkeypatch.setattr(landmarks_module, "_CACHE_PATH", fake_cache)
+
+        def fake_urlretrieve(url, filename):
+            raise ssl.SSLError("simulated certificate verify failed")
+
+        monkeypatch.setattr(
+            landmarks_module.urllib.request, "urlretrieve", fake_urlretrieve
+        )
+
+        with pytest.raises(RuntimeError, match="Install Certificates"):
+            model_path()
 
 
 class TestFaceLandmarkerDetect:

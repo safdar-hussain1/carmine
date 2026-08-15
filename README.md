@@ -286,7 +286,7 @@ web/src/gen/          constants.json + test_vectors.json, generated from Python
 web/public/           bundled model, wasm, demo portrait, DESIGN_CARD, ARCHITECTURE
 scripts/              benchmark, stability_bench, figures, constants/fixture export,
                       verify_site (headless browser), build_notebook
-tests/                226 pytest tests
+tests/                227 pytest tests
 notebooks/            the executed engineering write-up
 reports/              benchmark.json, browser_metrics.json, figures/
 docs/                 the built site (GitHub Pages)
@@ -346,7 +346,7 @@ python scripts/mutation_battery.py
 | lipstick stays off teeth/mouth interior | `test_masks.py::TestLipMask::test_near_zero_at_mouth_opening_centroid` |
 | tint never touches pixels outside its mask | `test_pigment.py::TestUntouchedRegionIsPreserved::…[tint-kwargs0]` |
 | tint keeps skin texture | `test_pigment.py::TestTint::test_preserves_texture_detail` |
-| One-Euro filter matches its own reference trace | `test_constants_sync.py::test_test_vectors_json_matches_generator` (+ TS trace test) |
+| One-Euro filter matches its own reference trace | `test_constants_sync.py::test_test_vectors_json_matches_generator` (TS trace test is a candidate killer, pinned to committed fixtures) |
 | `constants.json` matches its generator | `test_constants_sync.py::test_constants_json_matches_generator` |
 | `test_vectors.json` matches what Python produced | `test_constants_sync.py::test_test_vectors_json_matches_generator` (+ TS pinning test) |
 | `opaque_fill` is measurably worse than the real engine | `test_baselines.py::TestOpaqueFill::test_erases_lip_texture` |

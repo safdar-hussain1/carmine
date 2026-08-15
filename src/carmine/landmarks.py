@@ -7,6 +7,8 @@ interface consistent with the rest of the engine.
 
 import hashlib
 import os
+import ssl
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -89,6 +91,43 @@ def _verify_checksum(path: Path, expected_hex: str) -> None:
         )
 
 
+def _download_model(tmp_path: Path) -> None:
+    """Download the model to ``tmp_path``, wrapping failures in RuntimeError.
+
+    Verify-then-promote: the caller is responsible for checksumming
+    ``tmp_path`` *before* it is renamed into the cache path, so a
+    partial/corrupt/wrong download never becomes the cached model. Any
+    temp file left behind by a failed download is removed here so a retry
+    starts clean.
+
+    Raises:
+        RuntimeError: If the download fails for any reason (network error,
+            TLS/certificate error, or any other OS-level failure), with a
+            message identifying the model URL, the cache path, the
+            ``CARMINE_MODEL`` override, and (for SSL failures specifically)
+            the macOS "Install Certificates.command" fix.
+    """
+    try:
+        urllib.request.urlretrieve(_MODEL_URL, tmp_path)
+    except (urllib.error.URLError, ssl.SSLError, OSError) as exc:
+        tmp_path.unlink(missing_ok=True)
+        ssl_hint = ""
+        if isinstance(exc, ssl.SSLError) or isinstance(
+            getattr(exc, "reason", None), ssl.SSLError
+        ):
+            ssl_hint = (
+                " This looks like an SSL/certificate error; on macOS, running "
+                "'/Applications/Python 3.x/Install Certificates.command' "
+                "(matching your Python version) often fixes it."
+            )
+        raise RuntimeError(
+            f"Failed to download the FaceLandmarker model from {_MODEL_URL} "
+            f"to {_CACHE_PATH}: {exc}. Set the {_ENV_OVERRIDE} environment "
+            f"variable to point at a local .task file to bypass the "
+            f"download entirely.{ssl_hint}"
+        ) from exc
+
+
 def model_path() -> Path:
     """Resolve the path to the FaceLandmarker model file.
 
@@ -99,14 +138,18 @@ def model_path() -> Path:
 
     Otherwise, the model is downloaded (if not already cached) to
     ``~/.cache/carmine/face_landmarker.task`` and its sha256 checksum is
-    verified against the hard-coded pin.
+    verified *before* the downloaded file is promoted into the cache path
+    (verify-then-promote), so a checksum failure never leaves a bad file at
+    the cache path -- only a rejected temp file, which is deleted.
 
     Returns:
         Path to a usable FaceLandmarker ``.task`` model file.
 
     Raises:
-        RuntimeError: If the downloaded file's checksum does not match the
-            pin. The corrupted/mismatched file is deleted.
+        RuntimeError: If the download fails (see `_download_model`), or if
+            the downloaded file's checksum does not match the pin. The
+            temp file is deleted in either case, and the cache path is
+            never left holding an unverified file.
     """
     override = os.environ.get(_ENV_OVERRIDE)
     if override:
@@ -115,7 +158,10 @@ def model_path() -> Path:
     if not _CACHE_PATH.exists():
         _CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
         tmp_path = _CACHE_PATH.with_suffix(".task.tmp")
-        urllib.request.urlretrieve(_MODEL_URL, tmp_path)
+        _download_model(tmp_path)
+        # Verify before promoting: a checksum failure here deletes tmp_path
+        # (see _verify_checksum) and never touches _CACHE_PATH.
+        _verify_checksum(tmp_path, _CHECKSUM)
         tmp_path.rename(_CACHE_PATH)
 
     _verify_checksum(_CACHE_PATH, _CHECKSUM)

@@ -29,9 +29,12 @@ class OneEuroFilter:
     """Adaptive low-pass filter for a stream of (478, 2) landmark arrays.
 
     Args:
-        freq: Expected sampling frequency in Hz, used only to seed the
-            first estimate -- every call after the first derives the
-            instantaneous frequency from the actual timestamps.
+        freq: Accepted for interface completeness (it mirrors the reference
+            implementation's constructor signature and is exported via
+            `inspect.signature` into the generated constants); unused by the
+            filter math -- the instantaneous frequency is always derived from
+            the actual timestamps passed to `__call__`, including on the
+            first call.
         min_cutoff: Baseline cutoff frequency; lower values damp jitter on
             a still signal more aggressively.
         beta: Speed coefficient; higher values let the cutoff rise faster

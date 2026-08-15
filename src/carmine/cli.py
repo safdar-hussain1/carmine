@@ -10,11 +10,16 @@ Every subcommand's flags live on its own subparser -- there are no top-level
 flags that could collide with a subcommand's flag of the same name.
 
 Error contract: user-facing problems (missing files, bad hex colors, invalid
-JSON, no face detected, an unreadable/unwritable video) are reported as a
-single ``error: ...`` line on stderr and exit code 2 -- never a traceback.
-When a `Look` fails validation with several problems at once, all of them are
-listed (one per line) since `Look.__post_init__` already collects them into a
-single `ValueError` message.
+JSON, no face detected, an unreadable/unwritable video, a failed/corrupt
+model download) are reported as a single ``error: ...`` line on stderr and
+exit code 2 -- never a traceback. When a `Look` fails validation with
+several problems at once, all of them are listed (one per line) since
+`Look.__post_init__` already collects them into a single `ValueError`
+message. Model-download and checksum failures surface as a bare
+`RuntimeError` from `carmine.landmarks.model_path` (not wrapped in
+`CliError` at the call site, since they can occur inside several
+subcommands); `main()` catches `RuntimeError` alongside `CliError` so they
+still hit the same single-line, exit-2 contract instead of a traceback.
 """
 
 from __future__ import annotations
@@ -342,7 +347,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return args.func(args)
-    except CliError as exc:
+    except (CliError, RuntimeError) as exc:
+        # RuntimeError is included alongside CliError so that model
+        # download/checksum failures (carmine.landmarks.model_path, which
+        # can be reached from several subcommands) hit the same single-line
+        # error: contract as every other user-facing failure, rather than
+        # an uncaught traceback.
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
