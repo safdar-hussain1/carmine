@@ -286,7 +286,7 @@ web/src/gen/          constants.json + test_vectors.json, generated from Python
 web/public/           bundled model, wasm, demo portrait, DESIGN_CARD, ARCHITECTURE
 scripts/              benchmark, stability_bench, figures, constants/fixture export,
                       verify_site (headless browser), build_notebook
-tests/                227 pytest tests
+tests/                235 pytest tests
 notebooks/            the executed engineering write-up
 reports/              benchmark.json, browser_metrics.json, figures/
 docs/                 the built site (GitHub Pages)
@@ -303,7 +303,7 @@ runtime dependency beyond the landmarker.
 ## Tests
 
 ```bash
-PYTHONPATH=src pytest                  # 227 tests
+PYTHONPATH=src pytest                  # 235 tests
 cd web && npx vitest run               # 76 tests
 python scripts/verify_site.py          # headless browser selftest, 9 checks
 ```
