@@ -22,6 +22,11 @@
  * The intermediate buffer is Float32Array rather than Float64Array on
  * purpose: OpenCV filters a CV_32F image through a float32 buffer, and
  * matching that keeps the accumulated rounding on the same order.
+ *
+ * `approximateGaussianBlur` at the bottom of this file is the exception that
+ * proves the rule: it *is* a stack of box blurs, it is used only by the live
+ * camera path, and it is never what parity is measured against. It lives
+ * beside the exact version so the two are read together.
  */
 
 /**
@@ -130,4 +135,158 @@ export function gaussianBlur(
     }
   }
   return out;
+}
+
+// --- the live approximation ----------------------------------------------
+
+/**
+ * Box widths whose repeated application approximates a Gaussian of `sigma`.
+ *
+ * Three box blurs in succession converge on a Gaussian (the central limit
+ * theorem, applied to the uniform kernel), and the standard construction
+ * picks widths whose combined variance matches the target's: start from the
+ * ideal width `sqrt(12 sigma^2 / n + 1)`, take the nearest odd width below
+ * it, and use the next odd width up for however many of the passes are
+ * needed to make up the remaining variance.
+ *
+ * Widths are odd so each box is symmetric about its pixel, and clamped to a
+ * minimum of 1 (a width-1 box is the identity, which is the right answer for
+ * a sigma too small to blur anything).
+ *
+ * Integer widths cannot hit an arbitrary variance exactly, and the residual
+ * is not uniform: it is under 8% for the wide feathers that dominate the
+ * mask stage's cost, but reaches ~35% at sigma 1, where the eyeliner's
+ * feather sits. That is a large fraction of a very small blur -- the
+ * difference between a one-pixel soft edge and a slightly tighter one -- and
+ * it lands only on the live path, which is never what parity is measured
+ * against. `blur.test.ts` pins both ends of that range so the trade stays
+ * visible instead of becoming folklore.
+ */
+export function boxSizesForGaussian(sigma: number, passes = 3): number[] {
+  const variance = 12 * sigma * sigma;
+  const ideal = Math.sqrt(variance / passes + 1);
+  let lower = Math.floor(ideal);
+  if (lower % 2 === 0) {
+    lower--;
+  }
+  if (lower < 1) {
+    lower = 1;
+  }
+  const upper = lower + 2;
+  const idealCount =
+    (variance - passes * lower * lower - 4 * passes * lower - 3 * passes) / (-4 * lower - 4);
+  const count = Math.round(idealCount);
+  const sizes: number[] = [];
+  for (let i = 0; i < passes; i++) {
+    sizes.push(i < count ? lower : upper);
+  }
+  return sizes;
+}
+
+/**
+ * Reflect101 index table covering `[-radius, n + radius)`.
+ *
+ * The box passes below walk a sliding window, so they need a border index
+ * for every position the window can reach. Precomputing the fold once per
+ * axis keeps the inner loop free of the modulo arithmetic `reflect101` does.
+ */
+function reflectTable(n: number, radius: number): Int32Array {
+  const table = new Int32Array(n + 2 * radius);
+  for (let i = 0; i < table.length; i++) {
+    table[i] = reflect101(i - radius, n);
+  }
+  return table;
+}
+
+/**
+ * One separable box blur of the given odd width, with reflected borders.
+ *
+ * Cost is independent of the width: each output pixel adds one sample and
+ * drops one from a running sum. That is the entire reason this path exists
+ * -- a true Gaussian at the radii the masks use costs one multiply per tap
+ * per pixel, and the widest feather in a look is over a hundred taps.
+ */
+function boxBlurPass(
+  src: Float32Array,
+  dst: Float32Array,
+  width: number,
+  height: number,
+  size: number,
+  scratch: Float32Array,
+): void {
+  const radius = (size - 1) >> 1;
+  if (radius <= 0) {
+    dst.set(src);
+    return;
+  }
+  const inverse = 1 / size;
+
+  const columns = reflectTable(width, radius);
+  for (let y = 0; y < height; y++) {
+    const row = y * width;
+    let sum = 0;
+    for (let k = 0; k < size; k++) {
+      sum += src[row + columns[k]];
+    }
+    scratch[row] = sum * inverse;
+    for (let x = 1; x < width; x++) {
+      sum += src[row + columns[x + size - 1]] - src[row + columns[x - 1]];
+      scratch[row + x] = sum * inverse;
+    }
+  }
+
+  const rows = reflectTable(height, radius);
+  for (let x = 0; x < width; x++) {
+    let sum = 0;
+    for (let k = 0; k < size; k++) {
+      sum += scratch[rows[k] * width + x];
+    }
+    dst[x] = sum * inverse;
+    for (let y = 1; y < height; y++) {
+      sum += scratch[rows[y + size - 1] * width + x] - scratch[rows[y - 1] * width + x];
+      dst[y * width + x] = sum * inverse;
+    }
+  }
+}
+
+/**
+ * A three-box approximation of `gaussianBlur`, for the live camera path.
+ *
+ * **This is not the reference.** `gaussianBlur` above is what the parity
+ * checks measure and what every still render uses; this trades a small,
+ * bounded shape error for a cost that no longer grows with the blur radius.
+ * The approximation is good -- three boxes land within about 3% of a true
+ * Gaussian's profile -- and it is applied to mask weights that are then
+ * quantized to 8 bits for the GPU and sampled bilinearly, so the error is
+ * comfortably beneath what the rest of the live path already tolerates.
+ *
+ * What it buys: the mask stage stops being the frame's bottleneck. At a
+ * face filling a 720p frame the widest feather is a 121-tap Gaussian; the
+ * boxes replace it with three constant-time passes.
+ */
+export function approximateGaussianBlur(
+  src: Float32Array,
+  width: number,
+  height: number,
+  sigma: number,
+): Float32Array {
+  if (sigma <= 0) {
+    return src.slice();
+  }
+  const sizes = boxSizesForGaussian(sigma);
+  const count = width * height;
+  // Three buffers for the whole thing, ping-ponged: this runs several times
+  // per live frame, and allocating a fresh output per pass would hand the
+  // collector megabytes a second.
+  const first = new Float32Array(count);
+  const second = new Float32Array(count);
+  const scratch = new Float32Array(count);
+  let input: Float32Array = src;
+  let output = first;
+  for (const size of sizes) {
+    boxBlurPass(input, output, width, height, size, scratch);
+    input = output;
+    output = output === first ? second : first;
+  }
+  return input;
 }

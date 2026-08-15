@@ -299,13 +299,35 @@ def _evaluate(ws_url: str, expression: str, timeout: float = 60.0):
         connection.close()
 
 
+# Renderer substrings that mean Chrome fell back to software rasterization.
+SOFTWARE_RENDERERS = ("swiftshader", "llvmpipe", "software", "lavapipe")
+
+
+def is_software_renderer(renderer: str) -> bool:
+    lowered = (renderer or "").lower()
+    return any(name in lowered for name in SOFTWARE_RENDERERS)
+
+
 def verify(
-    url: str | None, timeout: float, with_parity: bool
+    url: str | None,
+    timeout: float,
+    with_parity: bool,
+    software_gl: bool = True,
 ) -> tuple[bool, str, dict | None]:
     """Runs the headless-Chrome selftest verification.
 
     Returns (passed, title_or_diagnostic, results). `results` is the page's
-    `window.__carmine_results`, pulled back only when `with_parity` is set.
+    `window.__carmine_results`, pulled back when `with_parity` is set or when
+    `software_gl` is off (the hardware-timing attempt wants the numbers even
+    though it mounts no fixtures).
+
+    `software_gl` forces SwiftShader, which is the right default: it is
+    reproducible, it works on machines with no GPU at all, and every
+    correctness check here is about what the code does rather than how fast
+    it does it. Turning it off asks Chrome for whatever real driver it can
+    find, which is only worth doing for the timing numbers -- and the caller
+    has to check the renderer string afterwards, because Chrome will happily
+    fall back to software without saying so.
     """
     server = None
     chrome_proc = None
@@ -333,12 +355,18 @@ def verify(
 
         chrome_bin = _find_chrome()
         devtools_port = _free_port()
+        gl_flags = (
+            ["--headless", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"]
+            if software_gl
+            # --headless=new runs the full browser compositor rather than the
+            # old headless shell, which is the only mode with any chance of
+            # reaching a real driver.
+            else ["--headless=new", "--enable-gpu", "--ignore-gpu-blocklist"]
+        )
         chrome_proc = subprocess.Popen(
             [
                 chrome_bin,
-                "--headless",
-                "--use-angle=swiftshader",
-                "--enable-unsafe-swiftshader",
+                *gl_flags,
                 f"--remote-debugging-port={devtools_port}",
                 "--no-first-run",
                 "--no-default-browser-check",
@@ -365,7 +393,7 @@ def verify(
             return False, f"timed out after {timeout}s; last title was: {title!r}", None
 
         results = None
-        if with_parity:
+        if with_parity or not software_gl:
             tab = _page_tab(devtools_port)
             ws_url = tab.get("webSocketDebuggerUrl") if tab else None
             if not ws_url:
@@ -415,18 +443,91 @@ def summarize(results: dict) -> str:
     if timing:
         lines.append(
             f"\ntiming ({timing['width']}x{timing['height']}, {timing['frames']} frames, "
-            f"look={timing['look']}):"
+            f"look={timing['look']}, interocular={_format_number(timing['interocularPx'])}px):"
         )
-        lines.append(f"  {'stage':<14} {'median ms':>10} {'min':>9} {'max':>9}")
+        lines.append(f"  {'stage':<24} {'median ms':>10} {'min':>9} {'max':>9}")
         for stage in ("detect", "buildMasks", "draw"):
             entry = timing[stage]
+            label = stage if stage == "detect" else f"{stage} (reference)"
             lines.append(
-                f"  {stage:<14} {_format_number(entry['median']):>10} "
+                f"  {label:<24} {_format_number(entry['median']):>10} "
                 f"{_format_number(entry['min']):>9} {_format_number(entry['max']):>9}"
             )
-        lines.append(f"  {'total':<14} {_format_number(timing['totalMedian']):>10}")
+        lines.append(
+            f"  {'total (reference)':<24} {_format_number(timing['totalMedian']):>10}"
+            f"   masks {timing['maskWidth']}x{timing['maskHeight']}"
+        )
+        live = timing.get("livePath")
+        if live:
+            for stage in ("buildMasks", "draw"):
+                entry = live[stage]
+                lines.append(
+                    f"  {stage + ' (live)':<24} {_format_number(entry['median']):>10} "
+                    f"{_format_number(entry['min']):>9} {_format_number(entry['max']):>9}"
+                )
+            lines.append(
+                f"  {'total (live)':<24} {_format_number(live['totalMedian']):>10}"
+                f"   masks {live['maskWidth']}x{live['maskHeight']}"
+            )
+            reference = timing["buildMasks"]["median"]
+            if live["buildMasks"]["median"] > 0:
+                speedup = reference / live["buildMasks"]["median"]
+                lines.append(f"  mask stage speedup: {speedup:.1f}x")
         lines.append(f"  renderer: {timing['glRenderer']}")
     return "\n".join(lines)
+
+
+def run_hardware_timing(args) -> int:
+    """Attempts a timing run on a real GPU and records whatever happens.
+
+    Every other number this script produces comes from SwiftShader, which is
+    reproducible but is not the hardware anyone runs the site on. This asks
+    Chrome for a real driver instead and, if it gets one, merges the timing
+    block into the metrics file under `timing_hardware`.
+
+    It records the *attempt* either way. A run that silently fell back to
+    software and got published as a GPU number would be worse than no GPU
+    number at all, so the renderer string decides, and a fallback is written
+    down as a fallback rather than dropped on the floor.
+    """
+    if not args.metrics_out.exists():
+        print(f"{args.metrics_out} not found; run --with-parity first")
+        return 1
+
+    timeout = args.timeout if args.timeout != 120.0 else 900.0
+    passed, title, results = verify(args.url, timeout, with_parity=False, software_gl=False)
+    print(title)
+
+    payload = json.loads(args.metrics_out.read_text(encoding="utf-8"))
+    timing = (results or {}).get("timing") if passed else None
+    renderer = (timing or {}).get("glRenderer", "")
+
+    if not passed:
+        record = {"attempted": True, "recorded": False, "reason": f"run failed: {title}"}
+    elif not timing:
+        record = {"attempted": True, "recorded": False, "reason": "page reported no timing block"}
+    elif is_software_renderer(renderer):
+        record = {
+            "attempted": True,
+            "recorded": False,
+            "reason": f"Chrome fell back to software rasterization: {renderer}",
+            "glRenderer": renderer,
+        }
+    else:
+        record = {"attempted": True, "recorded": True, "glRenderer": renderer, "timing": timing}
+
+    payload["timing_hardware"] = record
+    args.metrics_out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+    if record["recorded"]:
+        print(f"\nhardware timing recorded on: {renderer}")
+        print(summarize({"timing": timing}))
+    else:
+        print(f"\nhardware timing not recorded: {record['reason']}")
+    print(f"\nupdated {args.metrics_out}")
+    # Not reaching a real GPU is a fact about the machine, not a failure of
+    # the build; the outcome is recorded either way.
+    return 0
 
 
 def main() -> int:
@@ -460,7 +561,16 @@ def main() -> int:
         default=METRICS_PATH,
         help=f"Where --with-parity writes its numbers (default: {METRICS_PATH.name})",
     )
+    parser.add_argument(
+        "--timing-only",
+        action="store_true",
+        help="Re-run without forcing SwiftShader and merge the timing numbers into the "
+        "metrics file as timing_hardware, if Chrome reaches a real GPU",
+    )
     args = parser.parse_args()
+
+    if args.timing_only:
+        return run_hardware_timing(args)
 
     # The parity and timing checks are far heavier than the six structural
     # ones (six full-frame CPU renders plus 120 landmark detections on a

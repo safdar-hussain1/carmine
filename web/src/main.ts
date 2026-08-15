@@ -98,6 +98,7 @@ registerCheck("renderer-compiles", async () => {
   ctx.fillRect(16, 16, 32, 32);
 
   const masks: MaskSet = {
+    quality: "exact",
     width: 8,
     height: 8,
     scale: 1 / 8,

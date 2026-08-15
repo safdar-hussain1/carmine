@@ -25,7 +25,7 @@
  */
 
 import { activeProducts, type LookConfig } from "../engine/look";
-import { buildMasks } from "../engine/masks";
+import { buildMasks, PROC_MAX_SIDE_LIVE } from "../engine/masks";
 import { createRenderer, type GlossInputs } from "../engine/renderer";
 import {
   computeGloss,
@@ -78,6 +78,26 @@ export interface TimingResults {
   /** Sum of the three medians -- the per-frame budget, if the stages ran
    * back to back with nothing overlapped. */
   totalMedian: number;
+  /**
+   * The same frame through the live path's mask construction: half
+   * processing resolution, box-approximated feathers. The detect stage is
+   * shared with the reference numbers above (it is the same detection,
+   * measured once and used by both), so `totalMedian` here includes it.
+   *
+   * This is the number that describes the shipped mirror. The reference
+   * numbers describe what a still render costs.
+   */
+  livePath: {
+    buildMasks: StageTiming;
+    draw: StageTiming;
+    totalMedian: number;
+    /** Mask resolution the live path built at, for the record. */
+    maskWidth: number;
+    maskHeight: number;
+  };
+  /** Mask resolution the reference path built at. */
+  maskWidth: number;
+  maskHeight: number;
 }
 
 function summarize(samples: number[]): StageTiming {
@@ -177,8 +197,14 @@ export async function measureTiming(
   const detectSamples: number[] = [];
   const maskSamples: number[] = [];
   const drawSamples: number[] = [];
+  const liveMaskSamples: number[] = [];
+  const liveDrawSamples: number[] = [];
   const products = activeProducts(look);
   let interocularPx = 0;
+  let maskWidth = 0;
+  let maskHeight = 0;
+  let liveMaskWidth = 0;
+  let liveMaskHeight = 0;
 
   try {
     renderer.resize(width, height);
@@ -186,6 +212,7 @@ export async function measureTiming(
       look.highlighter.intensity > 0 ||
       (look.lipstick.intensity > 0 && look.lipstick.finish === "gloss");
     const procCanvas = document.createElement("canvas");
+    const liveProcCanvas = document.createElement("canvas");
     let timestamp = performance.now();
 
     // Warm-up, and not only for the JIT and the shader cache. The landmarker
@@ -221,8 +248,11 @@ export async function measureTiming(
             `${width}x${height})`,
         );
       }
+      // --- reference path ---
       const masks = buildMasks(landmarks, width, height, products);
       interocularPx = masks.interocular;
+      maskWidth = masks.width;
+      maskHeight = masks.height;
       let gloss: GlossInputs = {};
       if (wantsGloss) {
         // Mirrors the live loop: only looks with a gloss finish pay for the
@@ -239,9 +269,35 @@ export async function measureTiming(
       gl?.finish();
       const t3 = performance.now();
 
+      // --- live path, same frame, same landmarks ---
+      const liveMasks = buildMasks(landmarks, width, height, products, "live");
+      liveMaskWidth = liveMasks.width;
+      liveMaskHeight = liveMasks.height;
+      let liveGloss: GlossInputs = {};
+      if (wantsGloss) {
+        const proc = toProcessingCanvas(
+          stage,
+          width,
+          height,
+          liveProcCanvas,
+          PROC_MAX_SIDE_LIVE,
+        );
+        const procCtx = proc.getContext("2d", { willReadFrequently: true });
+        if (procCtx) {
+          const data = procCtx.getImageData(0, 0, proc.width, proc.height);
+          liveGloss = computeGloss(toFloatPixels(data), liveMasks, look);
+        }
+      }
+      const t4 = performance.now();
+      renderer.render(stage, liveMasks, look, liveGloss);
+      gl?.finish();
+      const t5 = performance.now();
+
       detectSamples.push(t1 - t0);
       maskSamples.push(t2 - t1);
       drawSamples.push(t3 - t2);
+      liveMaskSamples.push(t4 - t3);
+      liveDrawSamples.push(t5 - t4);
     }
   } finally {
     renderer.dispose();
@@ -250,6 +306,8 @@ export async function measureTiming(
   const detect = summarize(detectSamples);
   const masksStage = summarize(maskSamples);
   const draw = summarize(drawSamples);
+  const liveMasks = summarize(liveMaskSamples);
+  const liveDraw = summarize(liveDrawSamples);
 
   return {
     width,
@@ -264,5 +322,14 @@ export async function measureTiming(
     buildMasks: masksStage,
     draw,
     totalMedian: detect.median + masksStage.median + draw.median,
+    maskWidth,
+    maskHeight,
+    livePath: {
+      buildMasks: liveMasks,
+      draw: liveDraw,
+      totalMedian: detect.median + liveMasks.median + liveDraw.median,
+      maskWidth: liveMaskWidth,
+      maskHeight: liveMaskHeight,
+    },
   };
 }

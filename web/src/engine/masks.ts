@@ -32,7 +32,7 @@
  * pedantic on a two-pixel-wide stroke.
  */
 
-import { featherKernelSize, gaussianBlur } from "./blur";
+import { approximateGaussianBlur, featherKernelSize, gaussianBlur } from "./blur";
 import constants from "../gen/constants.json";
 
 const R = constants.regions;
@@ -40,6 +40,29 @@ const M = constants.masks;
 
 /** Long-side cap for the resolution masks are built at. */
 export const PROC_MAX_SIDE = 720;
+
+/**
+ * Long-side cap for the *live* path, half the reference one.
+ *
+ * Halving the long side quarters the pixel count, and every mask is heavily
+ * feathered before it is used -- the detail lost to the downscale is detail
+ * the feather was about to destroy. The renderer already samples masks as
+ * bilinear textures at output resolution, so nothing downstream changes;
+ * the upscale is the same smooth interpolation the feather is producing.
+ */
+export const PROC_MAX_SIDE_LIVE = 360;
+
+/**
+ * How faithfully a mask set is built.
+ *
+ * `exact` is the reference: full processing resolution, true Gaussian
+ * feathers, the thing `carmine.masks` is compared against and the thing
+ * every still render uses. `live` is the camera path -- half resolution and
+ * box-approximated feathers, both documented where they are implemented.
+ * The distinction is explicit at the call site rather than inferred from
+ * context, so nothing can quietly measure parity against the approximation.
+ */
+export type MaskQuality = "exact" | "live";
 
 /** Products that have a mask. `skin` backs smoothing, which the live shader
  * path does not run (see renderer.ts). */
@@ -64,6 +87,8 @@ export const MASK_NAMES: readonly MaskName[] = [
 
 /** A frame's masks plus the resolution they were built at. */
 export interface MaskSet {
+  /** Which construction produced these. */
+  quality: MaskQuality;
   /** Processing-resolution width the masks are sized for. */
   width: number;
   /** Processing-resolution height the masks are sized for. */
@@ -337,9 +362,13 @@ function feather(
   width: number,
   height: number,
   sigma: number,
+  quality: MaskQuality,
 ): Float32Array {
   if (sigma <= 0) {
     return mask;
+  }
+  if (quality === "live") {
+    return approximateGaussianBlur(mask, width, height, sigma);
   }
   return gaussianBlur(mask, width, height, sigma, featherKernelSize(sigma));
 }
@@ -376,11 +405,19 @@ class MaskBuilder {
   readonly width: number;
   readonly height: number;
   readonly interocular: number;
+  readonly quality: MaskQuality;
   private readonly points: Float64Array;
 
-  constructor(landmarks: ArrayLike<number>, width: number, height: number, scale: number) {
+  constructor(
+    landmarks: ArrayLike<number>,
+    width: number,
+    height: number,
+    scale: number,
+    quality: MaskQuality,
+  ) {
     this.width = width;
     this.height = height;
+    this.quality = quality;
     this.points = new Float64Array(landmarks.length);
     for (let i = 0; i < landmarks.length; i++) {
       this.points[i] = landmarks[i] * scale;
@@ -413,7 +450,7 @@ class MaskBuilder {
   }
 
   feather(mask: Float32Array, sigma: number): Float32Array {
-    return feather(mask, this.width, this.height, sigma);
+    return feather(mask, this.width, this.height, sigma, this.quality);
   }
 
   stroke(mask: Float32Array, points: Point[], thickness: number, value = 1): void {
@@ -649,13 +686,18 @@ const BUILDERS: Record<MaskName, (b: MaskBuilder) => Float32Array> = {
   skin: skinMask,
 };
 
-/** Processing-resolution dimensions for a source of the given size. */
+/** Processing-resolution dimensions for a source of the given size.
+ *
+ * @param maxSide Long-side cap. Defaults to the reference `PROC_MAX_SIDE`;
+ *   the live path passes `PROC_MAX_SIDE_LIVE`.
+ */
 export function processingSize(
   width: number,
   height: number,
+  maxSide: number = PROC_MAX_SIDE,
 ): { width: number; height: number; scale: number } {
   const longSide = Math.max(width, height);
-  const scale = longSide > PROC_MAX_SIDE ? PROC_MAX_SIDE / longSide : 1;
+  const scale = longSide > maxSide ? maxSide / longSide : 1;
   return {
     width: Math.max(1, Math.round(width * scale)),
     height: Math.max(1, Math.round(height * scale)),
@@ -676,15 +718,22 @@ export function processingSize(
  * @param width Source width in pixels.
  * @param height Source height in pixels.
  * @param activeProducts Mask names to build; unknown names are ignored.
+ * @param quality `exact` (default) for the reference construction, `live`
+ *   for the camera path's half-resolution, box-feathered one.
  */
 export function buildMasks(
   landmarks: ArrayLike<number>,
   width: number,
   height: number,
   activeProducts: Set<string>,
+  quality: MaskQuality = "exact",
 ): MaskSet {
-  const size = processingSize(width, height);
-  const builder = new MaskBuilder(landmarks, size.width, size.height, size.scale);
+  const size = processingSize(
+    width,
+    height,
+    quality === "live" ? PROC_MAX_SIDE_LIVE : PROC_MAX_SIDE,
+  );
+  const builder = new MaskBuilder(landmarks, size.width, size.height, size.scale, quality);
   const masks: Partial<Record<MaskName, Float32Array>> = {};
   for (const name of MASK_NAMES) {
     if (activeProducts.has(name)) {
@@ -692,6 +741,7 @@ export function buildMasks(
     }
   }
   return {
+    quality,
     width: size.width,
     height: size.height,
     scale: size.scale,

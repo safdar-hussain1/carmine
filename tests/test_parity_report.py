@@ -48,7 +48,7 @@ CPU_P99_DELTA_E_LIMIT = 5.0
 CPU_MAX_DELTA_E_LIMIT = 12.0
 
 EXPECTED_FRAMES = 3
-EXPECTED_LOOKS = {"velvet-satin", "glass"}
+EXPECTED_LOOKS = {"velvet-satin", "glass", "velvet-matte-brows"}
 
 
 def _sha256(path: Path) -> str:
@@ -82,7 +82,7 @@ def manifest():
 
 
 @pytest.mark.slow
-def test_manifest_describes_three_frames_and_two_looks(manifest):
+def test_manifest_describes_three_frames_and_three_looks(manifest):
     assert len(manifest["frames"]) == EXPECTED_FRAMES
     assert set(manifest["looks"]) == EXPECTED_LOOKS
     for frame in manifest["frames"]:
@@ -196,6 +196,53 @@ def test_gpu_parity_is_recorded_with_its_renderer(metrics):
     assert metrics["parity"]["glRenderer"]
     for case in metrics["parity"]["gpu"]:
         assert math.isfinite(case["meanDeltaE"])
+
+
+def test_live_path_is_fast_enough_to_be_live(metrics):
+    """The point of the live mask path.
+
+    The reference construction costs hundreds of milliseconds on a face that
+    fills the frame -- feather radii scale with the face, not the frame -- so
+    the mirror builds masks at half resolution with box-approximated
+    feathers. This pins that it is actually paying off; a regression that
+    quietly routed the live loop back through the exact path would otherwise
+    only show up as a mirror nobody wants to use.
+    """
+    timing = metrics["timing"]
+    live = timing["livePath"]
+    assert live["maskWidth"] * 2 <= timing["maskWidth"] + 2
+    assert live["buildMasks"]["median"] < 40.0
+    assert live["buildMasks"]["median"] < timing["buildMasks"]["median"]
+    assert live["totalMedian"] < timing["totalMedian"]
+    for stage in ("buildMasks", "draw"):
+        entry = live[stage]
+        assert math.isfinite(entry["median"]) and entry["median"] > 0, stage
+        assert entry["samples"] == timing["frames"], stage
+    assert live["totalMedian"] == pytest.approx(
+        timing["detect"]["median"] + live["buildMasks"]["median"] + live["draw"]["median"]
+    )
+
+
+def test_hardware_timing_attempt_is_recorded_either_way(metrics):
+    """`--timing-only` retries without forcing software rasterization.
+
+    Whether it reaches a real driver depends on the machine, so the schema
+    admits both outcomes -- but it must never claim a hardware number while
+    sitting on a software renderer, which is what the last branch checks.
+    """
+    record = metrics["timing_hardware"]
+    assert record["attempted"] is True
+    if not record["recorded"]:
+        assert record["reason"]
+        return
+    renderer = record["glRenderer"]
+    assert renderer
+    assert not any(
+        name in renderer.lower() for name in ("swiftshader", "llvmpipe", "software", "lavapipe")
+    ), renderer
+    timing = record["timing"]
+    assert timing["livePath"]["totalMedian"] > 0
+    assert timing["livePath"]["totalMedian"] < timing["totalMedian"]
 
 
 def test_timing_medians_are_finite_and_positive(metrics):

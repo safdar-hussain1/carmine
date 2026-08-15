@@ -73,7 +73,7 @@ DATASET_FRAMES = 2
 def fixture_looks() -> dict[str, object]:
     """The looks each frame is rendered through.
 
-    Two looks, chosen to cover disjoint halves of the engine:
+    Three looks, between them covering every product and every finish:
 
     * ``velvet-satin`` is the benchmark look (`scripts/benchmark.py` uses the
       same overrides), exercising blush, eyeshadow, a lipstick tint and the
@@ -81,11 +81,14 @@ def fixture_looks() -> dict[str, object]:
     * ``glass`` exercises the two gloss passes -- highlighter and a gloss
       lipstick -- which are the only places a whole-region percentile
       reduction feeds the per-pixel math.
+    * ``velvet-matte-brows`` covers what the other two leave out: the matte
+      finish (velvet's native lipstick finish, a Gaussian-of-L pull that no
+      other look here triggers) and the brow mask, which is zero-intensity
+      in every preset and would otherwise never be compared at all.
 
-    Both drop smoothing to zero. ``velvet``'s lipstick is forced to satin so
-    the pair does not double up on gloss while leaving the plain tint path
-    unmeasured; the matte finish is consequently *not* covered by these
-    fixtures, and neither are brows (zero intensity in both presets).
+    All three drop smoothing to zero, because the browser has no bilateral
+    filter on either path -- a fixture using it would measure a missing
+    feature rather than a disagreement.
     """
     velvet = PRESETS["velvet"]
     velvet_satin = dataclasses.replace(
@@ -94,7 +97,16 @@ def fixture_looks() -> dict[str, object]:
         smoothing=0.0,
     )
     glass = dataclasses.replace(PRESETS["glass"], smoothing=0.0)
-    return {"velvet-satin": velvet_satin, "glass": glass}
+    velvet_matte_brows = dataclasses.replace(
+        velvet,
+        brows=dataclasses.replace(velvet.brows, intensity=0.4),
+        smoothing=0.0,
+    )
+    return {
+        "velvet-satin": velvet_satin,
+        "glass": glass,
+        "velvet-matte-brows": velvet_matte_brows,
+    }
 
 
 def downscale(image: np.ndarray, max_side: int = PROC_MAX_SIDE) -> np.ndarray:

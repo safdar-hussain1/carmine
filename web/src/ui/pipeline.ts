@@ -5,7 +5,13 @@
  */
 
 import { createLandmarker, type Landmarker } from "../lib/landmarks";
-import { buildMasks, processingSize, type MaskSet } from "../engine/masks";
+import {
+  buildMasks,
+  processingSize,
+  PROC_MAX_SIDE,
+  type MaskQuality,
+  type MaskSet,
+} from "../engine/masks";
 import { glossPercentiles, tint, paint, finishMatte, finishGloss } from "../engine/pigment";
 import { hexToRgb } from "../engine/color";
 import { activeProducts, lightnessPullFor, PRODUCT_ORDER, type LookConfig } from "../engine/look";
@@ -52,14 +58,22 @@ export function loadImageElement(url: string): Promise<HTMLImageElement> {
   });
 }
 
-/** Draws any source into a 2D canvas at processing resolution. */
+/**
+ * Draws any source into a 2D canvas at processing resolution.
+ *
+ * @param maxSide Long-side cap. Callers that pair the result with a mask set
+ *   must pass the cap that set was built at -- `glossPercentiles` indexes a
+ *   mask and an image with the same counter, so a mismatch is not a quality
+ *   question but a correctness one.
+ */
 export function toProcessingCanvas(
   source: CanvasImageSource,
   width: number,
   height: number,
   scratch?: HTMLCanvasElement,
+  maxSide: number = PROC_MAX_SIDE,
 ): HTMLCanvasElement {
-  const size = processingSize(width, height);
+  const size = processingSize(width, height, maxSide);
   const canvas = scratch ?? document.createElement("canvas");
   canvas.width = size.width;
   canvas.height = size.height;
@@ -95,14 +109,21 @@ export function computeGloss(pixels: Float32Array, masks: MaskSet, look: LookCon
   return gloss;
 }
 
-/** Builds the masks a look needs from a detected face. */
+/**
+ * Builds the masks a look needs from a detected face.
+ *
+ * @param quality `exact` (default) is the reference construction, and what
+ *   every still render and every parity measurement uses. The live camera
+ *   loop passes `live`; see `masks.ts` for what that trades away.
+ */
 export function masksFor(
   landmarks: ArrayLike<number>,
   width: number,
   height: number,
   look: LookConfig,
+  quality: MaskQuality = "exact",
 ): MaskSet {
-  return buildMasks(landmarks, width, height, activeProducts(look));
+  return buildMasks(landmarks, width, height, activeProducts(look), quality);
 }
 
 /**

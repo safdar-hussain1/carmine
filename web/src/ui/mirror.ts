@@ -18,7 +18,7 @@ import { startCamera, stopCamera, loadPhoto } from "../lib/camera";
 import { createRenderer, type Renderer } from "../engine/renderer";
 import { OneEuroFilter } from "../engine/oneEuro";
 import type { LookConfig } from "../engine/look";
-import type { MaskSet } from "../engine/masks";
+import { PROC_MAX_SIDE_LIVE, type MaskSet } from "../engine/masks";
 import {
   applyLookCpu,
   computeGloss,
@@ -35,7 +35,14 @@ import { ICONS } from "./icons";
 /** Long side the drawing buffer is capped at, matching the camera request. */
 const MAX_OUTPUT_SIDE = 1280;
 
-const EMPTY_MASKS: MaskSet = { width: 1, height: 1, scale: 1, interocular: 0, masks: {} };
+const EMPTY_MASKS: MaskSet = {
+  quality: "exact",
+  width: 1,
+  height: 1,
+  scale: 1,
+  interocular: 0,
+  masks: {},
+};
 
 type Mode = "idle" | "live" | "photo" | "denied" | "unsupported";
 
@@ -269,14 +276,21 @@ export function createMirror(options: MirrorOptions): Mirror {
       landmarks = Float32Array.from(filter.filter(landmarks, timestampMs / 1000));
     }
 
-    const masks = masksFor(landmarks, width, height, look);
+    // The live path: half-resolution masks with box-approximated feathers.
+    // Building them the reference way costs hundreds of milliseconds on a
+    // face that fills the frame -- the feather radii scale with the face,
+    // not with the frame -- which is the difference between a mirror and a
+    // slideshow. The still-photo path below keeps the exact construction.
+    const masks = masksFor(landmarks, width, height, look, "live");
 
     let gloss = {};
     const needsGloss =
       (look.highlighter.intensity > 0 && masks.masks.highlighter) ||
       (look.lipstick.intensity > 0 && look.lipstick.finish === "gloss" && masks.masks.lipstick);
     if (needsGloss) {
-      const proc = toProcessingCanvas(source, width, height, procCanvas);
+      // Sized to the mask set, not to the reference cap: the percentile
+      // reduction walks masks and pixels with one index.
+      const proc = toProcessingCanvas(source, width, height, procCanvas, PROC_MAX_SIDE_LIVE);
       const ctx = proc.getContext("2d", { willReadFrequently: true });
       if (ctx) {
         const data = ctx.getImageData(0, 0, proc.width, proc.height);
