@@ -8,19 +8,34 @@ title on PASS; exits 1 and prints diagnostics otherwise.
 
 Usage:
     python scripts/verify_site.py [--url URL] [--timeout SECONDS]
-                                  [--expect-checks N]
+                                  [--expect-checks N] [--with-parity]
 
 The title carries the aggregate result and the number of checks that ran, so
 adding a check needs no change here -- but `--expect-checks` is enforced by
 default, because a check that silently stops being registered would otherwise
 still report PASS.
+
+`--with-parity` additionally mounts `reports/parity_fixtures/` at `/parity/`
+and requires the parity checks to have actually run. Those fixtures are
+renders of dataset faces: they are git-ignored, they are never copied into
+`docs/`, and this mount is the only way they are ever served -- over
+localhost, to a headless browser, for the duration of one verification. The
+default (no flag) run is the deployed-site path, where `/parity/` does not
+exist, the checks skip themselves, and the selftest still passes.
+
+With `--with-parity`, `window.__carmine_results` is pulled back over the
+DevTools protocol and the parity and timing numbers are written to
+`reports/browser_metrics.json`. That file holds numbers only -- no image
+data -- which is why it is the part of this measurement that gets committed.
 """
 
 from __future__ import annotations
 
 import argparse
+import base64
 import http.server
 import json
+import os
 import re
 import shutil
 import socket
@@ -29,14 +44,20 @@ import sys
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DOCS_DIR = REPO_ROOT / "docs"
+PARITY_DIR = REPO_ROOT / "reports" / "parity_fixtures"
+METRICS_PATH = REPO_ROOT / "reports" / "browser_metrics.json"
 
 # Number of checks web/src/main.ts registers. Bumped whenever one is added.
-EXPECTED_CHECKS = 6
+EXPECTED_CHECKS = 9
+
+# Checks that only run when the parity fixtures are mounted.
+PARITY_CHECKS = ("parity-cpu", "parity-gpu")
 
 CHROME_CANDIDATES = [
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -62,49 +83,253 @@ def _free_port() -> int:
         return sock.getsockname()[1]
 
 
-def _serve_docs(directory: Path, port: int) -> http.server.ThreadingHTTPServer:
-    handler_cls = type(
-        "DocsHandler",
-        (http.server.SimpleHTTPRequestHandler,),
-        {},
-    )
+def _serve_docs(
+    directory: Path, port: int, parity_dir: Path | None
+) -> http.server.ThreadingHTTPServer:
+    """Serve `directory` at /, optionally overlaying `parity_dir` at /parity/.
 
-    def make_handler(*args, **kwargs):
-        return handler_cls(*args, directory=str(directory), **kwargs)
+    Two roots rather than a copy: copying the fixtures into `docs/` would put
+    dataset faces one `npm run build` away from being published, and the
+    whole point is that they never enter the shipped tree.
+    """
 
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", port), make_handler)
+    class Handler(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=str(directory), **kwargs)
+
+        def translate_path(self, path):
+            if parity_dir is not None:
+                # Strip the query/fragment the base class also discards
+                # before deciding whether this is a parity request.
+                clean = path.split("?", 1)[0].split("#", 1)[0]
+                if clean.startswith("/parity/"):
+                    relative = clean[len("/parity/") :]
+                    # posixpath-style containment check: a "..' segment must
+                    # not be able to escape the fixture directory.
+                    resolved = (parity_dir / relative).resolve()
+                    if parity_dir.resolve() in resolved.parents or resolved == parity_dir.resolve():
+                        return str(resolved)
+                    return str(parity_dir / "__forbidden__")
+            return super().translate_path(path)
+
+        def log_message(self, *args):  # noqa: D102 - silence request logging
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", port), Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server
 
 
-def _get_tab_title(devtools_port: int) -> str | None:
+def _tabs(devtools_port: int) -> list[dict] | None:
     try:
         with urllib.request.urlopen(f"http://127.0.0.1:{devtools_port}/json", timeout=2) as resp:
-            tabs = json.loads(resp.read())
+            return json.loads(resp.read())
     except (urllib.error.URLError, ConnectionError, TimeoutError, json.JSONDecodeError):
+        return None
+
+
+def _page_tab(devtools_port: int) -> dict | None:
+    tabs = _tabs(devtools_port)
+    if tabs is None:
         return None
     for tab in tabs:
         if tab.get("type") == "page":
-            return tab.get("title")
+            return tab
     return None
 
 
-def verify(url: str | None, timeout: float) -> tuple[bool, str]:
+def _get_tab_title(devtools_port: int) -> str | None:
+    tab = _page_tab(devtools_port)
+    return tab.get("title") if tab else None
+
+
+class _DevToolsSocket:
+    """The smallest WebSocket client that can drive one DevTools command.
+
+    The DevTools protocol needs a WebSocket, and this project's Python
+    dependencies are the engine's -- OpenCV, MediaPipe, NumPy. Pulling in a
+    WebSocket library so a verification script can read one JSON blob would
+    put a dependency in the install path of everyone who only wants the
+    engine, so the ~60 lines of framing it actually needs live here instead.
+
+    Only what CDP over loopback requires is implemented: a client handshake,
+    masked text frames out, and reassembly of text/continuation frames in.
+    Ping and close are handled because Chrome sends them; binary frames and
+    compression extensions are not, because Chrome never offers them here.
+    """
+
+    def __init__(self, url: str, timeout: float) -> None:
+        parsed = urllib.parse.urlparse(url)
+        self._socket = socket.create_connection(
+            (parsed.hostname, parsed.port or 80), timeout=timeout
+        )
+        self._buffer = b""
+        key = base64.b64encode(os.urandom(16)).decode()
+        path = parsed.path or "/"
+        if parsed.query:
+            path = f"{path}?{parsed.query}"
+        request = (
+            f"GET {path} HTTP/1.1\r\n"
+            f"Host: {parsed.hostname}:{parsed.port}\r\n"
+            "Upgrade: websocket\r\n"
+            "Connection: Upgrade\r\n"
+            f"Sec-WebSocket-Key: {key}\r\n"
+            "Sec-WebSocket-Version: 13\r\n\r\n"
+        )
+        self._socket.sendall(request.encode())
+        header = self._read_until(b"\r\n\r\n")
+        if b" 101 " not in header.split(b"\r\n", 1)[0]:
+            raise RuntimeError(f"DevTools refused the WebSocket upgrade: {header[:120]!r}")
+
+    def _read_until(self, marker: bytes) -> bytes:
+        while marker not in self._buffer:
+            chunk = self._socket.recv(65536)
+            if not chunk:
+                raise RuntimeError("DevTools closed the connection during the handshake")
+            self._buffer += chunk
+        head, self._buffer = self._buffer.split(marker, 1)
+        return head + marker
+
+    def _read_exactly(self, count: int) -> bytes:
+        while len(self._buffer) < count:
+            chunk = self._socket.recv(65536)
+            if not chunk:
+                raise RuntimeError("DevTools closed the connection mid-frame")
+            self._buffer += chunk
+        data, self._buffer = self._buffer[:count], self._buffer[count:]
+        return data
+
+    def send(self, payload: str) -> None:
+        data = payload.encode()
+        length = len(data)
+        header = bytearray([0x81])  # FIN + text opcode
+        if length < 126:
+            header.append(0x80 | length)
+        elif length < (1 << 16):
+            header.append(0x80 | 126)
+            header += length.to_bytes(2, "big")
+        else:
+            header.append(0x80 | 127)
+            header += length.to_bytes(8, "big")
+        mask = os.urandom(4)
+        header += mask
+        # Client frames must be masked (RFC 6455 §5.3).
+        masked = bytes(byte ^ mask[i % 4] for i, byte in enumerate(data))
+        self._socket.sendall(bytes(header) + masked)
+
+    def _recv_frame(self) -> tuple[int, bool, bytes]:
+        first, second = self._read_exactly(2)
+        opcode = first & 0x0F
+        fin = bool(first & 0x80)
+        length = second & 0x7F
+        if length == 126:
+            length = int.from_bytes(self._read_exactly(2), "big")
+        elif length == 127:
+            length = int.from_bytes(self._read_exactly(8), "big")
+        if second & 0x80:  # server frames are never masked, but be safe
+            mask = self._read_exactly(4)
+            body = self._read_exactly(length)
+            body = bytes(byte ^ mask[i % 4] for i, byte in enumerate(body))
+        else:
+            body = self._read_exactly(length)
+        return opcode, fin, body
+
+    def recv(self) -> str:
+        parts: list[bytes] = []
+        while True:
+            opcode, fin, body = self._recv_frame()
+            if opcode == 0x8:
+                raise RuntimeError("DevTools closed the WebSocket")
+            if opcode == 0x9:  # ping -> pong, unmasked payload echoed back
+                self.send_pong(body)
+                continue
+            if opcode == 0xA:
+                continue
+            parts.append(body)
+            if fin:
+                return b"".join(parts).decode()
+
+    def send_pong(self, payload: bytes) -> None:
+        mask = os.urandom(4)
+        header = bytes([0x8A, 0x80 | len(payload)]) + mask
+        self._socket.sendall(
+            header + bytes(byte ^ mask[i % 4] for i, byte in enumerate(payload))
+        )
+
+    def close(self) -> None:
+        try:
+            self._socket.close()
+        except OSError:
+            pass
+
+
+def _evaluate(ws_url: str, expression: str, timeout: float = 60.0):
+    """Run `expression` in the page and return its value.
+
+    The expression is evaluated with `returnByValue`, so what comes back is
+    already JSON rather than a remote object handle.
+    """
+    connection = _DevToolsSocket(ws_url, timeout)
+    try:
+        connection.send(
+            json.dumps(
+                {
+                    "id": 1,
+                    "method": "Runtime.evaluate",
+                    "params": {
+                        "expression": expression,
+                        "returnByValue": True,
+                        "awaitPromise": True,
+                    },
+                }
+            )
+        )
+        while True:
+            message = json.loads(connection.recv())
+            if message.get("id") != 1:
+                # Unsolicited protocol events (console messages, lifecycle
+                # notifications) share the socket; skip anything not ours.
+                continue
+            result = message.get("result", {})
+            if "exceptionDetails" in result:
+                raise RuntimeError(f"page evaluation failed: {result['exceptionDetails']}")
+            return result.get("result", {}).get("value")
+    finally:
+        connection.close()
+
+
+def verify(
+    url: str | None, timeout: float, with_parity: bool
+) -> tuple[bool, str, dict | None]:
     """Runs the headless-Chrome selftest verification.
 
-    Returns (passed, title_or_diagnostic).
+    Returns (passed, title_or_diagnostic, results). `results` is the page's
+    `window.__carmine_results`, pulled back only when `with_parity` is set.
     """
     server = None
     chrome_proc = None
     try:
         target_url = url
+        parity_dir = None
+        if with_parity:
+            if not PARITY_DIR.is_dir():
+                return (
+                    False,
+                    f"parity fixtures not found at {PARITY_DIR}; "
+                    "run scripts/export_parity_fixtures.py first",
+                    None,
+                )
+            parity_dir = PARITY_DIR
+
         if target_url is None:
             if not DOCS_DIR.exists():
-                return False, f"docs/ not found at {DOCS_DIR}; run `npm run build` first"
+                return False, f"docs/ not found at {DOCS_DIR}; run the web build first", None
             srv_port = _free_port()
-            server = _serve_docs(DOCS_DIR, srv_port)
+            server = _serve_docs(DOCS_DIR, srv_port, parity_dir)
             target_url = f"http://127.0.0.1:{srv_port}/index.html?selftest=1"
+        elif parity_dir is not None:
+            return False, "--with-parity cannot be combined with --url", None
 
         chrome_bin = _find_chrome()
         devtools_port = _free_port()
@@ -135,11 +360,20 @@ def verify(url: str | None, timeout: float) -> tuple[bool, str]:
             time.sleep(0.5)
 
         if title is None:
-            return False, f"timed out after {timeout}s waiting for Chrome DevTools to respond"
+            return False, f"timed out after {timeout}s waiting for Chrome DevTools", None
         if not title.startswith("SELFTEST"):
-            return False, f"timed out after {timeout}s; last title was: {title!r}"
+            return False, f"timed out after {timeout}s; last title was: {title!r}", None
 
-        return title.startswith("SELFTEST PASS"), title
+        results = None
+        if with_parity:
+            tab = _page_tab(devtools_port)
+            ws_url = tab.get("webSocketDebuggerUrl") if tab else None
+            if not ws_url:
+                return False, "no DevTools WebSocket URL for the page", None
+            results = _evaluate(ws_url, "JSON.stringify(window.__carmine_results)")
+            results = json.loads(results) if isinstance(results, str) else results
+
+        return title.startswith("SELFTEST PASS"), title, results
     finally:
         if chrome_proc is not None:
             chrome_proc.terminate()
@@ -149,6 +383,50 @@ def verify(url: str | None, timeout: float) -> tuple[bool, str]:
                 chrome_proc.kill()
         if server is not None:
             server.shutdown()
+
+
+def _format_number(value: float) -> str:
+    return f"{value:.3f}"
+
+
+def summarize(results: dict) -> str:
+    """A human-readable table of the parity and timing numbers."""
+    lines: list[str] = []
+    parity = results.get("parity") or {}
+    for label, key in (("cpu (fixed landmarks)", "cpu"), ("gpu (live shader)", "gpu"),
+                       ("end-to-end (own landmarker)", "endToEnd")):
+        cases = parity.get(key)
+        if not cases:
+            continue
+        lines.append(f"\n{label}:")
+        lines.append(f"  {'frame':<16} {'look':<14} {'mean ΔE':>9} {'p99 ΔE':>9} {'max ΔE':>9} {'outside':>8}")
+        for case in cases:
+            lines.append(
+                f"  {case['frame']:<16} {case['look']:<14} "
+                f"{_format_number(case['meanDeltaE']):>9} "
+                f"{_format_number(case['p99DeltaE']):>9} "
+                f"{_format_number(case['maxDeltaE']):>9} "
+                f"{case['changedOutsideSupport']:>8}"
+            )
+    if parity.get("glRenderer"):
+        lines.append(f"\nGL renderer: {parity['glRenderer']}")
+
+    timing = results.get("timing")
+    if timing:
+        lines.append(
+            f"\ntiming ({timing['width']}x{timing['height']}, {timing['frames']} frames, "
+            f"look={timing['look']}):"
+        )
+        lines.append(f"  {'stage':<14} {'median ms':>10} {'min':>9} {'max':>9}")
+        for stage in ("detect", "buildMasks", "draw"):
+            entry = timing[stage]
+            lines.append(
+                f"  {stage:<14} {_format_number(entry['median']):>10} "
+                f"{_format_number(entry['min']):>9} {_format_number(entry['max']):>9}"
+            )
+        lines.append(f"  {'total':<14} {_format_number(timing['totalMedian']):>10}")
+        lines.append(f"  renderer: {timing['glRenderer']}")
+    return "\n".join(lines)
 
 
 def main() -> int:
@@ -170,11 +448,35 @@ def main() -> int:
         default=EXPECTED_CHECKS,
         help=f"Fail unless exactly this many checks ran (default: {EXPECTED_CHECKS}; 0 disables)",
     )
+    parser.add_argument(
+        "--with-parity",
+        action="store_true",
+        help="Mount reports/parity_fixtures at /parity/, require the parity checks to run, "
+        "and write reports/browser_metrics.json",
+    )
+    parser.add_argument(
+        "--metrics-out",
+        type=Path,
+        default=METRICS_PATH,
+        help=f"Where --with-parity writes its numbers (default: {METRICS_PATH.name})",
+    )
     args = parser.parse_args()
 
-    passed, title = verify(args.url, args.timeout)
+    # The parity and timing checks are far heavier than the six structural
+    # ones (six full-frame CPU renders plus 120 landmark detections on a
+    # software rasterizer), so they get a longer default budget.
+    timeout = args.timeout
+    if args.with_parity and timeout == 120.0:
+        timeout = 900.0
+
+    passed, title, results = verify(args.url, timeout, args.with_parity)
     print(title)
     if not passed:
+        # Print whatever was measured before the failing check threw: a
+        # parity check that fails its threshold has already recorded the
+        # per-fixture numbers, and those numbers are the diagnosis.
+        if results:
+            print(summarize(results))
         return 1
 
     if args.expect_checks:
@@ -183,6 +485,43 @@ def main() -> int:
         if ran != args.expect_checks:
             print(f"expected {args.expect_checks} checks, {ran} ran")
             return 1
+
+    if not args.with_parity:
+        return 0
+
+    if not results:
+        print("no results pulled from the page")
+        return 1
+
+    selftest = results.get("selftest") or {}
+    by_name = {entry["name"]: entry for entry in selftest.get("results", [])}
+    for name in PARITY_CHECKS:
+        entry = by_name.get(name)
+        if entry is None:
+            print(f"check {name} did not run")
+            return 1
+        if entry.get("skipped"):
+            print(f"check {name} skipped ({entry.get('reason')}) but --with-parity requires it")
+            return 1
+
+    parity = results.get("parity") or {}
+    if parity.get("skipped"):
+        print(f"parity measurement skipped: {parity.get('reason')}")
+        return 1
+
+    payload = {
+        "parity": parity,
+        "timing": results.get("timing"),
+        "selftest": {
+            "count": selftest.get("count"),
+            "skipped": selftest.get("skipped"),
+            "pass": selftest.get("pass"),
+        },
+    }
+    args.metrics_out.parent.mkdir(parents=True, exist_ok=True)
+    args.metrics_out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    print(summarize(results))
+    print(f"\nwrote {args.metrics_out}")
     return 0
 
 

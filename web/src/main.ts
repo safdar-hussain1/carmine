@@ -18,7 +18,17 @@ import "./styles.css";
 import { createRenderer } from "./engine/renderer";
 import { PRESETS, PRODUCT_ORDER } from "./engine/look";
 import type { MaskSet } from "./engine/masks";
-import { registerCheck, runSelftest } from "./lib/selftest";
+import {
+  loadFixtures,
+  measureCpu,
+  measureEndToEnd,
+  measureGpu,
+  worstOf,
+  type FixtureSet,
+  type ParityResults,
+} from "./lib/parity";
+import { registerCheck, runSelftest, skip } from "./lib/selftest";
+import { measureTiming } from "./lib/timing";
 import { mountApp } from "./ui/app";
 import { DEMO_PORTRAIT_URL, loadImageElement, masksFor, sharedLandmarker } from "./ui/pipeline";
 import { PRODUCTS } from "./ui/shades";
@@ -212,6 +222,133 @@ registerCheck("pipeline-canned-frame", async () => {
   } finally {
     renderer.dispose();
   }
+});
+
+// --- parity and performance -----------------------------------------------
+
+/**
+ * Thresholds the CPU parity check enforces, and what each is for.
+ *
+ * The permitted sources of difference on this path are narrow: the two Lab
+ * implementations (OpenCV interpolates its gamma and cube-root through
+ * lookup tables, color.ts evaluates them directly, worth up to ~0.43 Lab
+ * units) and single-level quantization on each side's byte conversion.
+ * Anything larger means something structural diverged.
+ *
+ * `mean` and `p99` are the gates that mean something. The worst measured
+ * values are 0.75 and 2.8, so both hold with real margin, and a mask
+ * rasterized differently or a finish applied in the wrong order would blow
+ * through them immediately.
+ *
+ * `max` is deliberately the loosest, because a single-pixel maximum over
+ * ~390k pixels is a measure of the worst rasterization tie, not of whether
+ * the engines agree. The measured worst is 11.4, and it is understood: 23
+ * pixels out of 388,800 exceed ΔE 6, every one of them on the boundary of
+ * the eyeliner stroke, where Python's feathered mask reads ~0.67 and this
+ * engine's ~0.32. Eyeliner is two pixels wide under a sigma-1 feather -- the
+ * one place in the engine where a one-pixel rasterization disagreement has
+ * nothing to hide behind. Two real bugs were found and fixed chasing this
+ * (see `strokePolyline`), which took the worst case from 23.1 to 11.4; the
+ * remainder is OpenCV's fixed-point convex-polygon scanline, which this
+ * engine does not reimplement. The limit is therefore set just above the
+ * measured value rather than at a round number that would silently pass a
+ * regression.
+ */
+const CPU_MEAN_DELTA_E_LIMIT = 2.0;
+const CPU_P99_DELTA_E_LIMIT = 5.0;
+const CPU_MAX_DELTA_E_LIMIT = 12.0;
+
+/** The fixture set, loaded once and shared by the parity checks. */
+let fixturePromise: Promise<FixtureSet | null> | null = null;
+
+function parityFixtures(): Promise<FixtureSet | null> {
+  if (fixturePromise === null) {
+    fixturePromise = loadFixtures();
+  }
+  return fixturePromise;
+}
+
+function parityResults(): ParityResults {
+  const existing = window.__carmine_results.parity;
+  if (existing) {
+    return existing;
+  }
+  const created: ParityResults = {};
+  window.__carmine_results.parity = created;
+  return created;
+}
+
+/**
+ * The reference path against the Python engine, from fixed landmarks.
+ *
+ * This is the check that can fail. Everything it compares is deterministic
+ * on both sides: same input pixels, same landmarks, same look, same product
+ * order (`applyLookCpu` follows `engine.apply_look`, gloss percentiles
+ * included, which are measured *after* the tint on both sides).
+ */
+registerCheck("parity-cpu", async () => {
+  const set = await parityFixtures();
+  const results = parityResults();
+  if (set === null) {
+    results.skipped = true;
+    results.reason = "fixtures are not mounted at ./parity/";
+    return skip("parity fixtures are not served");
+  }
+  results.skipped = false;
+  results.fixtures = { frames: set.fixtures.length, looks: set.looks.size };
+
+  const cases = measureCpu(set);
+  results.cpu = cases;
+  results.endToEnd = await measureEndToEnd(set);
+
+  const worst = worstOf(cases);
+  if (worst.mean >= CPU_MEAN_DELTA_E_LIMIT) {
+    throw new Error(
+      `worst mean ΔE ${worst.mean.toFixed(3)} exceeds ${CPU_MEAN_DELTA_E_LIMIT}`,
+    );
+  }
+  if (worst.p99 >= CPU_P99_DELTA_E_LIMIT) {
+    throw new Error(`worst p99 ΔE ${worst.p99.toFixed(3)} exceeds ${CPU_P99_DELTA_E_LIMIT}`);
+  }
+  if (worst.max >= CPU_MAX_DELTA_E_LIMIT) {
+    throw new Error(`worst max ΔE ${worst.max.toFixed(3)} exceeds ${CPU_MAX_DELTA_E_LIMIT}`);
+  }
+  if (worst.outside > 0) {
+    throw new Error(`${worst.outside} pixels changed outside the mask support`);
+  }
+});
+
+/**
+ * The live shader path against the same references. Report-only.
+ *
+ * No threshold is enforced, for two reasons that are both about honesty
+ * rather than leniency. The shader takes documented approximations the CPU
+ * reference does not (pre-tint gloss percentiles, 8-bit mask weights, a mip
+ * level standing in for the matte blur), so it is expected to differ; and
+ * headless verification runs on a software rasterizer, whose float behavior
+ * is not the hardware this ships to. Gating on that number would be gating
+ * on the wrong machine. The number is recorded and published with the
+ * renderer string attached.
+ */
+registerCheck("parity-gpu", async () => {
+  const set = await parityFixtures();
+  const results = parityResults();
+  if (set === null) {
+    return skip("parity fixtures are not served");
+  }
+  const { cases, glRenderer } = measureGpu(set);
+  results.gpu = cases;
+  results.glRenderer = glRenderer;
+});
+
+/** Per-stage frame cost. Report-only: the machine running it is the
+ * variable, so there is no threshold that would mean the same thing twice. */
+registerCheck("timing", async () => {
+  window.__carmine_results.timing = await measureTiming(
+    DEMO_PORTRAIT_URL,
+    PRESETS.velvet,
+    "velvet",
+  );
 });
 
 function bootstrap(): void {

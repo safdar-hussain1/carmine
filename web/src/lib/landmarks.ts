@@ -53,12 +53,24 @@ export async function createLandmarker(modelUrl: string): Promise<Landmarker> {
     faceLandmarker = await createFaceLandmarker(modelUrl, "CPU");
   }
 
+  // detectForVideo rejects a timestamp that does not advance, and one
+  // instance is shared by every caller on the page (see pipeline.ts). Two
+  // callers each deriving timestamps from their own clock -- a render loop
+  // from requestAnimationFrame, a batch job counting frames of its own --
+  // can hand it a value behind one it has already seen, and the detector
+  // then silently returns no face. Clamping here makes that impossible for
+  // any caller, while leaving the timestamp each caller reasons about (the
+  // landmark smoothing filter's, for one) untouched.
+  let lastTimestamp = Number.NEGATIVE_INFINITY;
+
   return {
     detect(source: TexImageSource, timestampMs: number): Float32Array | null {
       const width = "videoWidth" in source ? source.videoWidth : (source as HTMLCanvasElement).width;
       const height = "videoHeight" in source ? source.videoHeight : (source as HTMLCanvasElement).height;
 
-      const result = faceLandmarker.detectForVideo(source, timestampMs);
+      const monotonic = timestampMs > lastTimestamp ? timestampMs : lastTimestamp + 1;
+      lastTimestamp = monotonic;
+      const result = faceLandmarker.detectForVideo(source, monotonic);
       const face = result.faceLandmarks[0];
       if (!face) {
         return null;
