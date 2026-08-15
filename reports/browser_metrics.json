@@ -11,10 +11,11 @@
         "look": "velvet-satin",
         "width": 540,
         "height": 720,
-        "supportPixels": 37076,
-        "meanDeltaE": 0.5677620979969764,
+        "comparedPixels": 37429,
+        "pythonOnlyPixels": 353,
+        "meanDeltaE": 0.5664229782275383,
         "maxDeltaE": 9.45936710362267,
-        "p99DeltaE": 2.7734869930195423,
+        "p99DeltaE": 2.762503194237005,
         "changedOutsideSupport": 0
       },
       {
@@ -22,10 +23,11 @@
         "look": "glass",
         "width": 540,
         "height": 720,
-        "supportPixels": 37766,
-        "meanDeltaE": 0.7500974730442194,
+        "comparedPixels": 38184,
+        "pythonOnlyPixels": 418,
+        "meanDeltaE": 0.7470403654747819,
         "maxDeltaE": 3.7656189726251657,
-        "p99DeltaE": 2.1926001077342856,
+        "p99DeltaE": 2.187728771414937,
         "changedOutsideSupport": 0
       },
       {
@@ -33,10 +35,11 @@
         "look": "velvet-matte-brows",
         "width": 540,
         "height": 720,
-        "supportPixels": 37228,
-        "meanDeltaE": 0.5939997421577272,
+        "comparedPixels": 37599,
+        "pythonOnlyPixels": 371,
+        "meanDeltaE": 0.5930419476586872,
         "maxDeltaE": 9.45936710362267,
-        "p99DeltaE": 2.755036241421791,
+        "p99DeltaE": 2.7529100444658816,
         "changedOutsideSupport": 0
       },
       {
@@ -44,10 +47,11 @@
         "look": "velvet-satin",
         "width": 540,
         "height": 720,
-        "supportPixels": 39699,
-        "meanDeltaE": 0.47664159527120187,
+        "comparedPixels": 40066,
+        "pythonOnlyPixels": 367,
+        "meanDeltaE": 0.476345344824925,
         "maxDeltaE": 11.434184797206031,
-        "p99DeltaE": 2.200325313438001,
+        "p99DeltaE": 2.197454440442197,
         "changedOutsideSupport": 0
       },
       {
@@ -55,10 +59,11 @@
         "look": "glass",
         "width": 540,
         "height": 720,
-        "supportPixels": 38222,
-        "meanDeltaE": 0.6758539641663268,
+        "comparedPixels": 38645,
+        "pythonOnlyPixels": 423,
+        "meanDeltaE": 0.6740625763548286,
         "maxDeltaE": 3.5605011972341316,
-        "p99DeltaE": 2.0059091237340483,
+        "p99DeltaE": 2.0018001714267046,
         "changedOutsideSupport": 0
       },
       {
@@ -66,10 +71,11 @@
         "look": "velvet-matte-brows",
         "width": 540,
         "height": 720,
-        "supportPixels": 40430,
-        "meanDeltaE": 0.5144631326982916,
+        "comparedPixels": 40824,
+        "pythonOnlyPixels": 394,
+        "meanDeltaE": 0.5143248617516902,
         "maxDeltaE": 11.434184797206031,
-        "p99DeltaE": 2.250315972853099,
+        "p99DeltaE": 2.244836473713622,
         "changedOutsideSupport": 0
       },
       {
@@ -77,10 +83,11 @@
         "look": "velvet-satin",
         "width": 720,
         "height": 540,
-        "supportPixels": 72117,
-        "meanDeltaE": 0.5091698251840884,
+        "comparedPixels": 72567,
+        "pythonOnlyPixels": 450,
+        "meanDeltaE": 0.5087246799044884,
         "maxDeltaE": 5.207158648563743,
-        "p99DeltaE": 1.7247820887093102,
+        "p99DeltaE": 1.7222237677773804,
         "changedOutsideSupport": 0
       },
       {
@@ -88,10 +95,11 @@
         "look": "glass",
         "width": 720,
         "height": 540,
-        "supportPixels": 67963,
-        "meanDeltaE": 0.6920662553058435,
+        "comparedPixels": 68515,
+        "pythonOnlyPixels": 552,
+        "meanDeltaE": 0.6907521650938984,
         "maxDeltaE": 3.236943162086855,
-        "p99DeltaE": 1.784215436198897,
+        "p99DeltaE": 1.7833491036652356,
         "changedOutsideSupport": 0
       },
       {
@@ -99,10 +107,11 @@
         "look": "velvet-matte-brows",
         "width": 720,
         "height": 540,
-        "supportPixels": 72919,
-        "meanDeltaE": 0.5510422974053552,
+        "comparedPixels": 73418,
+        "pythonOnlyPixels": 499,
+        "meanDeltaE": 0.5506771701202505,
         "maxDeltaE": 5.207158648563743,
-        "p99DeltaE": 1.7853885306419095,
+        "p99DeltaE": 1.776621202712642,
         "changedOutsideSupport": 0
       }
     ],
@@ -112,10 +121,11 @@
         "look": "velvet-satin",
         "width": 540,
         "height": 720,
-        "supportPixels": 37164,
-        "meanDeltaE": 0.6968864815221307,
+        "comparedPixels": 37668,
+        "pythonOnlyPixels": 504,
+        "meanDeltaE": 0.693855520590095,
         "maxDeltaE": 22.445314414768976,
-        "p99DeltaE": 5.194095454009968,
+        "p99DeltaE": 5.144741851293181,
         "changedOutsideSupport": 0
       },
       {
@@ -123,10 +133,11 @@
         "look": "glass",
         "width": 540,
         "height": 720,
-        "supportPixels": 37641,
-        "meanDeltaE": 0.7723018898471579,
+        "comparedPixels": 38283,
+        "pythonOnlyPixels": 642,
+        "meanDeltaE": 0.7688064823618598,
         "maxDeltaE": 5.995554962763097,
-        "p99DeltaE": 2.4990191090367464,
+        "p99DeltaE": 2.4886096431487448,
         "changedOutsideSupport": 0
       },
       {
@@ -134,10 +145,11 @@
         "look": "velvet-matte-brows",
         "width": 540,
         "height": 720,
-        "supportPixels": 37330,
-        "meanDeltaE": 0.7319677930022167,
+        "comparedPixels": 37840,
+        "pythonOnlyPixels": 510,
+        "meanDeltaE": 0.728994834109648,
         "maxDeltaE": 22.445314414768976,
-        "p99DeltaE": 5.1746432628675185,
+        "p99DeltaE": 5.149676367649962,
         "changedOutsideSupport": 0
       },
       {
@@ -145,10 +157,11 @@
         "look": "velvet-satin",
         "width": 540,
         "height": 720,
-        "supportPixels": 39560,
-        "meanDeltaE": 0.804471187826843,
+        "comparedPixels": 40746,
+        "pythonOnlyPixels": 1183,
+        "meanDeltaE": 0.7931692492841311,
         "maxDeltaE": 22.875145534507045,
-        "p99DeltaE": 7.8645844341031985,
+        "p99DeltaE": 7.78035533851995,
         "changedOutsideSupport": 0
       },
       {
@@ -156,10 +169,11 @@
         "look": "glass",
         "width": 540,
         "height": 720,
-        "supportPixels": 37953,
-        "meanDeltaE": 0.8514989214985333,
+        "comparedPixels": 39034,
+        "pythonOnlyPixels": 1081,
+        "meanDeltaE": 0.8459311144152076,
         "maxDeltaE": 9.415861544212575,
-        "p99DeltaE": 4.772990215210961,
+        "p99DeltaE": 4.66704501025385,
         "changedOutsideSupport": 0
       },
       {
@@ -167,10 +181,11 @@
         "look": "velvet-matte-brows",
         "width": 540,
         "height": 720,
-        "supportPixels": 40248,
-        "meanDeltaE": 0.8497442310108544,
+        "comparedPixels": 41498,
+        "pythonOnlyPixels": 1249,
+        "meanDeltaE": 0.8398276707644314,
         "maxDeltaE": 22.875145534507045,
-        "p99DeltaE": 7.840552247701112,
+        "p99DeltaE": 7.734457714317808,
         "changedOutsideSupport": 0
       },
       {
@@ -178,10 +193,11 @@
         "look": "velvet-satin",
         "width": 720,
         "height": 540,
-        "supportPixels": 58722,
-        "meanDeltaE": 2.162549956634815,
+        "comparedPixels": 77539,
+        "pythonOnlyPixels": 18810,
+        "meanDeltaE": 2.6154119209715248,
         "maxDeltaE": 30.135439650830264,
-        "p99DeltaE": 19.057735405107046,
+        "p99DeltaE": 18.45446798078262,
         "changedOutsideSupport": 0
       },
       {
@@ -189,10 +205,11 @@
         "look": "glass",
         "width": 720,
         "height": 540,
-        "supportPixels": 63129,
-        "meanDeltaE": 1.9015175272455374,
+        "comparedPixels": 81858,
+        "pythonOnlyPixels": 18722,
+        "meanDeltaE": 2.2596681287117133,
         "maxDeltaE": 19.58841166554215,
-        "p99DeltaE": 14.572797174117543,
+        "p99DeltaE": 14.23667612026988,
         "changedOutsideSupport": 0
       },
       {
@@ -200,10 +217,11 @@
         "look": "velvet-matte-brows",
         "width": 720,
         "height": 540,
-        "supportPixels": 58722,
-        "meanDeltaE": 2.303685430195525,
+        "comparedPixels": 78355,
+        "pythonOnlyPixels": 19626,
+        "meanDeltaE": 2.7170219653706638,
         "maxDeltaE": 30.135439650830264,
-        "p99DeltaE": 18.92084824273229,
+        "p99DeltaE": 18.420125792239237,
         "changedOutsideSupport": 0
       }
     ],
@@ -213,10 +231,11 @@
         "look": "velvet-satin",
         "width": 540,
         "height": 720,
-        "supportPixels": 37076,
-        "meanDeltaE": 0.6782255926677458,
+        "comparedPixels": 37429,
+        "pythonOnlyPixels": 353,
+        "meanDeltaE": 0.675844670723022,
         "maxDeltaE": 9.845543647179827,
-        "p99DeltaE": 2.998680793321432,
+        "p99DeltaE": 2.979471527930907,
         "changedOutsideSupport": 0
       },
       {
@@ -224,10 +243,11 @@
         "look": "glass",
         "width": 540,
         "height": 720,
-        "supportPixels": 37766,
-        "meanDeltaE": 0.9483015346200373,
+        "comparedPixels": 38184,
+        "pythonOnlyPixels": 418,
+        "meanDeltaE": 0.9430746884758371,
         "maxDeltaE": 7.711523256738613,
-        "p99DeltaE": 2.2039013495101405,
+        "p99DeltaE": 2.197633553948349,
         "changedOutsideSupport": 0
       },
       {
@@ -235,10 +255,11 @@
         "look": "velvet-matte-brows",
         "width": 540,
         "height": 720,
-        "supportPixels": 37228,
-        "meanDeltaE": 0.801313116039231,
+        "comparedPixels": 37599,
+        "pythonOnlyPixels": 371,
+        "meanDeltaE": 0.7983097016643957,
         "maxDeltaE": 9.845543647179827,
-        "p99DeltaE": 3.5553738201487186,
+        "p99DeltaE": 3.5507935063436604,
         "changedOutsideSupport": 0
       },
       {
@@ -246,10 +267,11 @@
         "look": "velvet-satin",
         "width": 540,
         "height": 720,
-        "supportPixels": 39699,
-        "meanDeltaE": 0.6273414405665115,
+        "comparedPixels": 40066,
+        "pythonOnlyPixels": 367,
+        "meanDeltaE": 0.6256647966888113,
         "maxDeltaE": 11.83118511650422,
-        "p99DeltaE": 2.2605070421428595,
+        "p99DeltaE": 2.250738256060274,
         "changedOutsideSupport": 0
       },
       {
@@ -257,10 +279,11 @@
         "look": "glass",
         "width": 540,
         "height": 720,
-        "supportPixels": 38222,
-        "meanDeltaE": 0.8886435468735738,
+        "comparedPixels": 38645,
+        "pythonOnlyPixels": 423,
+        "meanDeltaE": 0.8845230092759394,
         "maxDeltaE": 3.0970500287883858,
-        "p99DeltaE": 1.891719794893568,
+        "p99DeltaE": 1.89073902735997,
         "changedOutsideSupport": 0
       },
       {
@@ -268,10 +291,11 @@
         "look": "velvet-matte-brows",
         "width": 540,
         "height": 720,
-        "supportPixels": 40430,
-        "meanDeltaE": 0.7265403132257732,
+        "comparedPixels": 40824,
+        "pythonOnlyPixels": 394,
+        "meanDeltaE": 0.7243552460532302,
         "maxDeltaE": 11.83118511650422,
-        "p99DeltaE": 2.9008856797526956,
+        "p99DeltaE": 2.895703068184984,
         "changedOutsideSupport": 0
       },
       {
@@ -279,10 +303,11 @@
         "look": "velvet-satin",
         "width": 720,
         "height": 540,
-        "supportPixels": 72117,
-        "meanDeltaE": 0.5895008660837256,
+        "comparedPixels": 72567,
+        "pythonOnlyPixels": 450,
+        "meanDeltaE": 0.58855757469908,
         "maxDeltaE": 5.598235420000389,
-        "p99DeltaE": 1.7749595037352068,
+        "p99DeltaE": 1.7728822222059861,
         "changedOutsideSupport": 0
       },
       {
@@ -290,10 +315,11 @@
         "look": "glass",
         "width": 720,
         "height": 540,
-        "supportPixels": 67963,
-        "meanDeltaE": 0.8873429511783258,
+        "comparedPixels": 68515,
+        "pythonOnlyPixels": 552,
+        "meanDeltaE": 0.8844555888927981,
         "maxDeltaE": 3.228522635397899,
-        "p99DeltaE": 1.8299330045314264,
+        "p99DeltaE": 1.8286081010512314,
         "changedOutsideSupport": 0
       },
       {
@@ -301,10 +327,11 @@
         "look": "velvet-matte-brows",
         "width": 720,
         "height": 540,
-        "supportPixels": 72919,
-        "meanDeltaE": 0.6860185589223433,
+        "comparedPixels": 73418,
+        "pythonOnlyPixels": 499,
+        "meanDeltaE": 0.6847360387023047,
         "maxDeltaE": 5.598235420000389,
-        "p99DeltaE": 2.3446682985186356,
+        "p99DeltaE": 2.3391535346935464,
         "changedOutsideSupport": 0
       }
     ],
@@ -320,40 +347,40 @@
     "glRenderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
     "fenced": true,
     "detect": {
-      "median": 72.90000003576279,
-      "min": 43.89999997615814,
-      "max": 195.30000007152557,
+      "median": 73.54999995231628,
+      "min": 43.700000047683716,
+      "max": 208.60000002384186,
       "samples": 120
     },
     "buildMasks": {
-      "median": 398.35000002384186,
-      "min": 390.39999997615814,
-      "max": 407.90000009536743,
+      "median": 392.1500000357628,
+      "min": 382.5,
+      "max": 424.1999999284744,
       "samples": 120
     },
     "draw": {
       "median": 3.200000047683716,
       "min": 2.899999976158142,
-      "max": 6.600000023841858,
+      "max": 6.200000047683716,
       "samples": 120
     },
-    "totalMedian": 474.45000010728836,
+    "totalMedian": 468.9000000357628,
     "maskWidth": 720,
     "maskHeight": 405,
     "livePath": {
       "buildMasks": {
-        "median": 7.400000035762787,
-        "min": 6.5,
-        "max": 13.800000071525574,
+        "median": 7.299999952316284,
+        "min": 6.399999976158142,
+        "max": 13.399999976158142,
         "samples": 120
       },
       "draw": {
-        "median": 1.7999999523162842,
+        "median": 1.7000000476837158,
         "min": 1.5,
-        "max": 3.8000000715255737,
+        "max": 5.5,
         "samples": 120
       },
-      "totalMedian": 82.10000002384186,
+      "totalMedian": 82.54999995231628,
       "maskWidth": 360,
       "maskHeight": 203
     }
@@ -373,44 +400,44 @@
       "frames": 120,
       "warmupFrames": 10,
       "look": "velvet",
-      "interocularPx": 198.77981825110174,
+      "interocularPx": 198.7798863622063,
       "glRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)",
       "fenced": true,
       "detect": {
-        "median": 18.600000023841858,
-        "min": 12.299999952316284,
-        "max": 24.299999952316284,
+        "median": 17.5,
+        "min": 12.200000047683716,
+        "max": 24.600000023841858,
         "samples": 120
       },
       "buildMasks": {
-        "median": 362.24999994039536,
-        "min": 353.2000000476837,
-        "max": 423.2999999523163,
+        "median": 357.55000001192093,
+        "min": 351.89999997615814,
+        "max": 414.60000002384186,
         "samples": 120
       },
       "draw": {
-        "median": 3.200000047683716,
-        "min": 2.700000047683716,
-        "max": 4.899999976158142,
+        "median": 3.199999988079071,
+        "min": 2.799999952316284,
+        "max": 7.100000023841858,
         "samples": 120
       },
-      "totalMedian": 384.05000001192093,
+      "totalMedian": 378.25,
       "maskWidth": 720,
       "maskHeight": 405,
       "livePath": {
         "buildMasks": {
-          "median": 7.450000047683716,
+          "median": 7.300000071525574,
           "min": 6.399999976158142,
-          "max": 13.100000023841858,
+          "max": 13.199999928474426,
           "samples": 120
         },
         "draw": {
           "median": 1.7999999523162842,
           "min": 1.5,
-          "max": 2.8000000715255737,
+          "max": 4.399999976158142,
           "samples": 120
         },
-        "totalMedian": 27.850000023841858,
+        "totalMedian": 26.600000023841858,
         "maskWidth": 360,
         "maskHeight": 203
       }

@@ -315,7 +315,9 @@ registerCheck("parity-cpu", async () => {
     throw new Error(`worst max ΔE ${worst.max.toFixed(3)} exceeds ${CPU_MAX_DELTA_E_LIMIT}`);
   }
   if (worst.outside > 0) {
-    throw new Error(`${worst.outside} pixels changed outside the mask support`);
+    throw new Error(
+      `${worst.outside} pixels changed outside the region either engine painted`,
+    );
   }
 });
 

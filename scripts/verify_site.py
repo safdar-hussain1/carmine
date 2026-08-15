@@ -27,6 +27,13 @@ With `--with-parity`, `window.__carmine_results` is pulled back over the
 DevTools protocol and the parity and timing numbers are written to
 `reports/browser_metrics.json`. That file holds numbers only -- no image
 data -- which is why it is the part of this measurement that gets committed.
+The write merges into whatever is already there, because `--timing-only`
+contributes a `timing_hardware` block this run cannot produce (it needs
+Chrome launched without software rasterization).
+
+Regenerating the metrics file from a clean slate therefore means running
+`--with-parity` first and `--timing-only` second; running them the other way
+round leaves a `timing_hardware` block measured against the previous bundle.
 """
 
 from __future__ import annotations
@@ -619,14 +626,23 @@ def main() -> int:
         print(f"parity measurement skipped: {parity.get('reason')}")
         return 1
 
-    payload = {
-        "parity": parity,
-        "timing": results.get("timing"),
-        "selftest": {
-            "count": selftest.get("count"),
-            "skipped": selftest.get("skipped"),
-            "pass": selftest.get("pass"),
-        },
+    # Merge rather than replace. `timing_hardware` is written by a separate
+    # `--timing-only` run (it needs a different Chrome configuration, so it
+    # cannot be produced here), and rewriting the file from scratch would
+    # delete it every time this ran -- quietly, since nothing downstream
+    # requires it to be present.
+    payload = {}
+    if args.metrics_out.exists():
+        try:
+            payload = json.loads(args.metrics_out.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            payload = {}
+    payload["parity"] = parity
+    payload["timing"] = results.get("timing")
+    payload["selftest"] = {
+        "count": selftest.get("count"),
+        "skipped": selftest.get("skipped"),
+        "pass": selftest.get("pass"),
     }
     args.metrics_out.parent.mkdir(parents=True, exist_ok=True)
     args.metrics_out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")

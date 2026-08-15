@@ -160,10 +160,30 @@ def test_every_case_measured_a_real_region(metrics):
     for key in ("cpu", "gpu", "endToEnd"):
         for case in metrics["parity"][key]:
             # A case that measured nothing would report a flawless mean.
-            assert case["supportPixels"] > 1000, (key, case["frame"])
+            assert case["comparedPixels"] > 1000, (key, case["frame"])
             for field in ("meanDeltaE", "p99DeltaE", "maxDeltaE"):
                 assert math.isfinite(case[field]), (key, case["frame"], field)
             assert case["meanDeltaE"] <= case["p99DeltaE"] <= case["maxDeltaE"]
+
+
+def test_compared_region_includes_what_only_python_painted(metrics):
+    """The compared region is a union, not this engine's own masks.
+
+    The two rasterizers disagree along mask boundaries, so the Python render
+    moves a thin ring of pixels the browser's support does not cover. Scoring
+    only the browser's support would drop exactly those pixels from the mean,
+    the percentile, the max and the containment count at once. The count is
+    recorded per case; this asserts it is being carried rather than silently
+    zero, which is what a regression to the old behavior would look like.
+    """
+    for key in ("cpu", "gpu", "endToEnd"):
+        cases = metrics["parity"][key]
+        for case in cases:
+            assert case["pythonOnlyPixels"] >= 0, (key, case["frame"])
+            assert case["pythonOnlyPixels"] < case["comparedPixels"], (key, case["frame"])
+        # Boundary disagreement is a property of two independent rasterizers;
+        # if no case anywhere reported one, the union is not being taken.
+        assert any(case["pythonOnlyPixels"] > 0 for case in cases), key
 
 
 def test_cpu_parity_is_within_the_published_thresholds(metrics):
@@ -230,6 +250,13 @@ def test_hardware_timing_attempt_is_recorded_either_way(metrics):
     admits both outcomes -- but it must never claim a hardware number while
     sitting on a software renderer, which is what the last branch checks.
     """
+    assert "timing_hardware" in metrics, (
+        "reports/browser_metrics.json has no timing_hardware block. Regenerate it "
+        "with `python scripts/verify_site.py --with-parity` followed by "
+        "`python scripts/verify_site.py --timing-only` -- in that order, since "
+        "--with-parity merges into the existing file and --timing-only is what "
+        "writes this block."
+    )
     record = metrics["timing_hardware"]
     assert record["attempted"] is True
     if not record["recorded"]:

@@ -16,12 +16,14 @@
  * That is why `loadFixtures` distinguishes "not served" from "served but
  * broken": the first is the normal deployed case, the second is a bug.
  *
- * **What the numbers mean.** Landmarks come from the fixture, not from this
- * page's landmarker, so the CPU number isolates rendering math from the two
- * sides' face detectors. The detector gap is measured separately as
- * `endToEnd` (re-detect on the same PNG, render again, compare to the same
- * reference) and is reported without a threshold, since it is a property of
- * two model runtimes rather than of this code.
+ * **What the numbers mean.** ΔE is reported over the union of this engine's
+ * product-mask support and every pixel the Python render changed, so neither
+ * side can be scored only where it chose to paint. Landmarks come from the
+ * fixture, not from this page's landmarker, so the CPU number isolates
+ * rendering math from the two sides' face detectors. The detector gap is
+ * measured separately as `endToEnd` (re-detect on the same PNG, render
+ * again, compare to the same reference) and is reported without a threshold,
+ * since it is a property of two model runtimes rather than of this code.
  */
 
 import { rgbToLab } from "../engine/color";
@@ -68,18 +70,33 @@ export interface ParityCase {
   look: string;
   width: number;
   height: number;
-  /** Pixels where at least one product mask is non-zero -- the only place
-   * either engine is allowed to have changed anything. */
-  supportPixels: number;
+  /**
+   * Pixels the comparison covers: the union of this engine's mask support
+   * and every pixel the Python render actually changed.
+   *
+   * Taking only this engine's masks would be marking its own homework. The
+   * two rasterizers disagree by a pixel here and there along mask
+   * boundaries, so Python paints a thin ring this engine's support does not
+   * cover -- and those are precisely the pixels where the engines differ
+   * most. Scoring only where *we* painted would drop them from the mean and
+   * hide them from the containment count at the same time.
+   */
+  comparedPixels: number;
+  /**
+   * Pixels inside the compared region that Python changed and this engine's
+   * masks do not cover -- the boundary ring described above, reported so its
+   * size is visible rather than inferred.
+   */
+  pythonOnlyPixels: number;
   meanDeltaE: number;
   maxDeltaE: number;
-  /** ΔE below which 99% of support pixels sit. A single rasterization
+  /** ΔE below which 99% of compared pixels sit. A single rasterization
    * disagreement on a mask boundary can dominate the max while being
    * invisible; the percentile says whether that is what happened. */
   p99DeltaE: number;
-  /** Pixels outside the mask support that this engine altered. Both engines
-   * promise to leave those bit-identical, so anything above zero is a
-   * containment bug rather than a precision difference. */
+  /** Pixels outside the compared region that this engine altered. Neither
+   * engine touched them, so anything above zero is a containment bug rather
+   * than a precision difference. */
   changedOutsideSupport: number;
 }
 
@@ -232,7 +249,8 @@ export async function loadFixtures(): Promise<FixtureSet | null> {
 
 // --- measurement ---------------------------------------------------------
 
-/** Pixels touched by any of a look's masks -- the comparison region. */
+/** Pixels touched by any of a look's masks. `compare` unions this with the
+ * pixels the Python render moved to get the region it actually scores. */
 function supportOf(masks: MaskSet): Uint8Array {
   const support = new Uint8Array(masks.width * masks.height);
   for (const mask of Object.values(masks.masks)) {
@@ -255,6 +273,14 @@ function supportOf(masks: MaskSet): Uint8Array {
  * engines already work in. A perceptually-uniform metric (CIEDE2000) would
  * flatter the result by discounting exactly the chroma differences a makeup
  * engine exists to produce, so the blunter metric is the honest one here.
+ *
+ * The compared region is the union of `support` (where *this* engine's masks
+ * are non-zero) and every pixel the Python render moved off the source. That
+ * second half matters more than it sounds: scoring only our own support
+ * would silently exclude the boundary ring where the two rasterizers
+ * disagree -- the pixels most likely to be wrong -- from the mean, the
+ * percentile, the max, *and* the containment count simultaneously. A bug
+ * that painted nothing at all would score a perfect zero under that rule.
  */
 export function compare(
   actual: Float32Array,
@@ -267,10 +293,17 @@ export function compare(
   let sum = 0;
   let max = 0;
   let changedOutside = 0;
+  let pythonOnly = 0;
 
   for (let i = 0; i < support.length; i++) {
     const p = i * 4;
-    if (support[i] === 0) {
+    const pythonChanged =
+      expected[p] !== source[p] ||
+      expected[p + 1] !== source[p + 1] ||
+      expected[p + 2] !== source[p + 2];
+    const covered = support[i] !== 0;
+
+    if (!covered && !pythonChanged) {
       if (
         actual[p] !== source[p] ||
         actual[p + 1] !== source[p + 1] ||
@@ -280,6 +313,10 @@ export function compare(
       }
       continue;
     }
+    if (!covered) {
+      pythonOnly++;
+    }
+
     const a = rgbToLab([actual[p], actual[p + 1], actual[p + 2]]);
     const b = rgbToLab([expected[p], expected[p + 1], expected[p + 2]]);
     const dl = a[0] - b[0];
@@ -294,14 +331,16 @@ export function compare(
   }
 
   deltas.sort((x, y) => x - y);
-  const p99 = deltas.length > 0 ? deltas[Math.min(deltas.length - 1, Math.floor(deltas.length * 0.99))] : 0;
+  const p99 =
+    deltas.length > 0 ? deltas[Math.min(deltas.length - 1, Math.floor(deltas.length * 0.99))] : 0;
 
   return {
     frame: meta.frame,
     look: meta.look,
     width: meta.width,
     height: meta.height,
-    supportPixels: deltas.length,
+    comparedPixels: deltas.length,
+    pythonOnlyPixels: pythonOnly,
     meanDeltaE: deltas.length > 0 ? sum / deltas.length : 0,
     maxDeltaE: max,
     p99DeltaE: p99,
@@ -420,9 +459,9 @@ export async function measureEndToEnd(set: FixtureSet): Promise<ParityCase[]> {
       }
       const masks = masksFor(detected, frame.width, frame.height, look);
       const actual = applyLookCpu(fixture.pixels, masks, look);
-      // Support comes from this render's own masks: with different
-      // landmarks the two engines paint slightly different regions, and the
-      // containment count is about *this* render staying inside *its* mask.
+      // Masks come from the browser's own landmarks here; `compare` unions
+      // them with what Python painted, so the region still covers both
+      // renders even though the two disagree about where the face is.
       cases.push(
         compare(actual, expected, fixture.pixels, supportOf(masks), {
           frame: frame.name,
