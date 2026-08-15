@@ -283,7 +283,7 @@ void main() {
         </div>
       </details>
     </div>
-  </section>`}const Nf="https://github.com/safdar-hussain1/virtual-makeup";function ys(e,t,n,r,i){let s="";for(let o=0;o<i;o++){const a=o/i*Math.PI*2,c=(e+Math.cos(a)*n).toFixed(1),d=(t+Math.sin(a)*r).toFixed(1);s+=`<circle cx="${c}" cy="${d}" r="0.9" fill="currentColor" stroke="none"/>`}return s}const Df=`
+  </section>`}const Nf="https://github.com/safdar-hussain1/carmine";function ys(e,t,n,r,i){let s="";for(let o=0;o<i;o++){const a=o/i*Math.PI*2,c=(e+Math.cos(a)*n).toFixed(1),d=(t+Math.sin(a)*r).toFixed(1);s+=`<circle cx="${c}" cy="${d}" r="0.9" fill="currentColor" stroke="none"/>`}return s}const Df=`
 <svg viewBox="0 0 100 60" fill="none" stroke="currentColor" stroke-width="0.7" stroke-linecap="round">
   <ellipse cx="50" cy="30" rx="16" ry="21" opacity="0.45"/>
   <path d="M38.5 22.5c2.2-1.8 5.4-1.8 7.6 0" opacity="0.7"/>

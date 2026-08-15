@@ -10,7 +10,7 @@
 
 import { ICONS } from "./icons";
 
-const REPO_URL = "https://github.com/safdar-hussain1/virtual-makeup";
+const REPO_URL = "https://github.com/safdar-hussain1/carmine";
 
 /** Points spaced around an ellipse -- the landmark dots in the first diagram. */
 function ellipseDots(cx: number, cy: number, rx: number, ry: number, count: number): string {

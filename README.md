@@ -4,7 +4,7 @@
 eyes, brows and cheeks in CIELAB, so the face keeps its own texture, highlights
 and shadow instead of flattening into a sticker of solid colour.
 
-**[Try the live mirror →](https://safdar-hussain1.github.io/virtual-makeup/)**
+**[Try the live mirror →](https://safdar-hussain1.github.io/carmine/)**
 Your camera, in your browser. No upload, no account, no network request after
 the page loads.
 
@@ -178,7 +178,7 @@ never the thing parity is measured against.
 ## Install
 
 ```bash
-git clone https://github.com/safdar-hussain1/virtual-makeup.git
+git clone https://github.com/safdar-hussain1/carmine.git
 cd virtual-makeup
 pip install -e .          # add [dev] for pytest + scikit-image
 ```
