@@ -423,6 +423,8 @@ void main() {
       <span class="site-footer__mark">Carmine</span>
       <span>MIT licensed</span>
       <a href="${Nf}" rel="noopener">Source on GitHub</a>
+      <a href="./DESIGN_CARD.md">Design card</a>
+      <a href="./ARCHITECTURE.md">Architecture</a>
       <span>Sample portrait: NASA, public domain</span>
     </div>
   </footer>`}const $u="carmine.theme";function Xf(){try{const e=localStorage.getItem($u);return e==="light"||e==="dark"?e:"system"}catch{return"system"}}function qf(){var e;return((e=window.matchMedia)==null?void 0:e.call(window,"(prefers-color-scheme: dark)").matches)??!1}function Hc(e){return e==="system"?qf()?"dark":"light":e}function jc(e){const t=document.documentElement;e==="system"?delete t.dataset.theme:t.dataset.theme=e}function Yf(e){var r;let t=Xf();const n=()=>{const i=Hc(t);e.dataset.resolved=i,e.setAttribute("aria-label",i==="dark"?"Switch to the light theme":"Switch to the dark theme")};return jc(t),n(),e.addEventListener("click",()=>{t=Hc(t)==="dark"?"light":"dark",jc(t);try{localStorage.setItem($u,t)}catch{}}),e.addEventListener("click",n),(r=window.matchMedia)==null||r.call(window,"(prefers-color-scheme: dark)").addEventListener("change",n),t}const Zf="everyday";function Jf(){const e=Rt[Zf]??Object.values(Rt)[0];return JSON.parse(JSON.stringify(e))}function Qf(e){var o,a;let t=Jf();e.innerHTML=`

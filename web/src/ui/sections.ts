@@ -222,6 +222,8 @@ export function footerHtml(): string {
       <span class="site-footer__mark">Carmine</span>
       <span>MIT licensed</span>
       <a href="${REPO_URL}" rel="noopener">Source on GitHub</a>
+      <a href="./DESIGN_CARD.md">Design card</a>
+      <a href="./ARCHITECTURE.md">Architecture</a>
       <span>Sample portrait: NASA, public domain</span>
     </div>
   </footer>`;
