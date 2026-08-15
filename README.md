@@ -303,7 +303,7 @@ runtime dependency beyond the landmarker.
 ## Tests
 
 ```bash
-PYTHONPATH=src pytest                  # 226 tests
+PYTHONPATH=src pytest                  # 227 tests
 cd web && npx vitest run               # 76 tests
 python scripts/verify_site.py          # headless browser selftest, 9 checks
 ```
@@ -326,6 +326,35 @@ What they pin, beyond the usual:
 - **Repository hygiene.** `tests/test_guards.py` scans every tracked text file
   for leaked absolute paths and stray process documents. It scans this README,
   the notebook and the cards too.
+
+### Mutation battery
+
+A test suite passing proves nothing about a claim it was never asked to
+catch. `scripts/mutation_battery.py` breaks each headline claim above on
+purpose — one at a time, by editing the exact line that makes it true — and
+checks that a *named* test goes red. Then it restores the file byte-for-byte
+and confirms that same test is green again. A claim whose mutation doesn't
+flip any test to red is reported as a survivor: a real gap, not a passing
+suite that happens to agree with the docs.
+
+```bash
+python scripts/mutation_battery.py
+```
+
+| claim broken | killer test |
+| --- | --- |
+| lipstick stays off teeth/mouth interior | `test_masks.py::TestLipMask::test_near_zero_at_mouth_opening_centroid` |
+| tint never touches pixels outside its mask | `test_pigment.py::TestUntouchedRegionIsPreserved::…[tint-kwargs0]` |
+| tint keeps skin texture | `test_pigment.py::TestTint::test_preserves_texture_detail` |
+| One-Euro filter matches its own reference trace | `test_constants_sync.py::test_test_vectors_json_matches_generator` (+ TS trace test) |
+| `constants.json` matches its generator | `test_constants_sync.py::test_constants_json_matches_generator` |
+| `test_vectors.json` matches what Python produced | `test_constants_sync.py::test_test_vectors_json_matches_generator` (+ TS pinning test) |
+| `opaque_fill` is measurably worse than the real engine | `test_baselines.py::TestOpaqueFill::test_erases_lip_texture` |
+| containment ignores a feathered mask's soft tail | `test_metrics.py::TestPigmentOnTarget::test_feathered_tail_below_threshold_does_not_count_as_inside` |
+| `data/` stays git-ignored | `test_guards.py::test_private_paths_are_ignored` |
+| no tracked file mentions the tooling | `test_guards.py::test_no_banned_words_in_tracked_files` |
+| published CPU ΔE is inside the browser's own gate | `test_parity_report.py::test_cpu_parity_is_within_the_published_thresholds` |
+| committed benchmark numbers stay internally consistent | `test_metrics.py::TestBenchmarkJsonSchema::test_photo_section_schema` |
 
 ## License
 

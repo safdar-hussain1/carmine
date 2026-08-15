@@ -48,6 +48,22 @@ class TestPigmentOnTarget:
         mask = np.zeros((10, 10), dtype=np.float32)
         assert metrics.pigment_on_target(before, before.copy(), mask) == pytest.approx(1.0)
 
+    def test_feathered_tail_below_threshold_does_not_count_as_inside(self):
+        # A mask value in the feathered tail (above 0, but below the 0.05
+        # "inside" cutoff) is a soft edge, not the legitimate target region.
+        # Energy that lands there has to count as "outside" or a baseline
+        # that paints a hard-edged blob just inside a feathered boundary
+        # would score as perfectly on-target.
+        before = _flat_image((20, 20), (120, 120, 120))
+        mask = np.zeros((20, 20), dtype=np.float32)
+        mask[5:15, 5:15] = 1.0
+        mask[0, 0] = 0.02  # below the 0.05 cutoff
+        after = before.copy()
+        after[5:15, 5:15] = (10, 200, 40)
+        after[0, 0] = (10, 200, 40)
+        score = metrics.pigment_on_target(before, after, mask)
+        assert score < 1.0
+
 
 class TestBackgroundUntouched:
     def test_identical_images_score_one(self):
