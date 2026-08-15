@@ -224,7 +224,7 @@ export function footerHtml(): string {
       <a href="${REPO_URL}" rel="noopener">Source on GitHub</a>
       <a href="./DESIGN_CARD.md">Design card</a>
       <a href="./ARCHITECTURE.md">Architecture</a>
-      <span>Sample portrait: NASA, public domain</span>
+      <span>Sample portrait: photo by Andrea Piacquadio on Pexels</span>
     </div>
   </footer>`;
 }

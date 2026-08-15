@@ -22,9 +22,9 @@ import { PROC_MAX_SIDE_LIVE, type MaskSet } from "../engine/masks";
 import {
   applyLookCpu,
   computeGloss,
-  DEMO_PORTRAIT_URL,
   loadImageElement,
   masksFor,
+  SAMPLE_PORTRAIT_URL,
   sharedLandmarker,
   toFloatPixels,
   toImageData,
@@ -79,7 +79,10 @@ function button(className: string, label: string, icon?: string): HTMLButtonElem
 }
 
 export function createMirror(options: MirrorOptions): Mirror {
-  const root = el("div");
+  // One block: the picture, its controls and the card naming what is on the
+  // face. They travel together, because on a wide screen the block is what
+  // sticks while the product rail beside it scrolls.
+  const root = el("div", "mirror-block");
 
   const stage = el("div", "stage");
   stage.dataset.mode = "idle";
@@ -490,7 +493,7 @@ export function createMirror(options: MirrorOptions): Mirror {
   async function useSample(): Promise<void> {
     sampleBtn.disabled = true;
     try {
-      const img = await loadImageElement(DEMO_PORTRAIT_URL);
+      const img = await loadImageElement(SAMPLE_PORTRAIT_URL);
       await showPhoto(img, img.naturalWidth, img.naturalHeight);
     } finally {
       sampleBtn.disabled = false;

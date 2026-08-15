@@ -22,7 +22,23 @@ const MATTE_STRENGTH = constants.pigment.finish_matte.default_strength;
 const HIGHLIGHTER_GLOSS_FACTOR = constants.pigment.finish_gloss.highlighter_strength_factor;
 
 export const MODEL_URL = "./models/face_landmarker.task";
+
+/**
+ * The frame the selftest renders. It is a fixed canned input, so it is kept
+ * separate from the sample the reader sees: swapping the sample must not move
+ * a published number.
+ */
 export const DEMO_PORTRAIT_URL = "./demo/portrait.jpg";
+
+/**
+ * The "Sample portrait" button's photo.
+ *
+ * Source: https://www.pexels.com/photo/3764546/ — photo by Andrea Piacquadio
+ * on Pexels, Pexels license (free to use and modify, no attribution required,
+ * redistribution in this repository permitted). Downscaled to 1600px on the
+ * long side, JPEG quality 85, EXIF stripped.
+ */
+export const SAMPLE_PORTRAIT_URL = "./demo/model.jpg";
 
 let landmarkerPromise: Promise<Landmarker> | null = null;
 

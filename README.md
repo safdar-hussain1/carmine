@@ -359,4 +359,5 @@ python scripts/mutation_battery.py
 ## License
 
 MIT — see [LICENSE](LICENSE). The FaceLandmarker model is Apache-2.0. The
-sample portrait is a NASA photograph, public domain.
+canned frame the selftest renders is a NASA photograph, public domain. Sample
+portrait: photo by Andrea Piacquadio on Pexels, Pexels license.

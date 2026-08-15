@@ -57,6 +57,10 @@
   --step-4: clamp(2rem, 4vw, 3rem);
   --display: clamp(2.4rem, 5.2vw, 4rem);
 
+  /* The masthead's own height: 60px of bar plus its hairline. Anything that
+     has to clear it -- the pinned mirror, scroll targets -- reads it here. */
+  --header-h: 61px;
+
   --gutter: clamp(1.25rem, 4vw, 3.5rem);
   --stack: clamp(4rem, 9vw, 8rem);
   --radius: 4px;
@@ -403,6 +407,67 @@ dl {
 }
 
 /*
+ * The rail is far taller than the mirror, so on a two-column layout the
+ * mirror is pinned under the masthead and the rail scrolls past it. That is
+ * the point of a mirror: you are meant to watch a shade land on the face
+ * while you pick it, not scroll back up to find out what you chose.
+ *
+ * The pinned block must never be taller than the space it is pinned into,
+ * or its bottom edge is unreachable. When room runs short the picture is the
+ * part that gives -- the huge flex-shrink spends the whole deficit on the
+ * stage, which `object-fit: cover` absorbs as a tighter crop rather than a
+ * distortion, and the card stays whole, because half a list of what you are
+ * wearing is worse than a slightly tighter frame. Past the stage's floor the
+ * card scrolls inside itself.
+ *
+ * Below 64rem the two columns stack, and a picture pinned above its own
+ * controls would just eat the screen -- so this whole behaviour is scoped to
+ * the wide layout.
+ */
+@media (min-width: 64rem) {
+  .mirror__stage {
+    position: sticky;
+    top: calc(var(--header-h) + 1.25rem);
+  }
+
+  .mirror-block {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100svh - var(--header-h) - 2.5rem);
+  }
+
+  .mirror-block > .stage {
+    flex: 0 1000 auto;
+    min-height: 15rem;
+  }
+
+  .mirror-block > .stage-bar {
+    flex: none;
+  }
+
+  .mirror-block > .shade-card {
+    flex: 0 1 auto;
+    /* Enough for the label and one row of shades: a card squeezed below that
+       is a scrollbar with a title on it, and at that point cropping the
+       picture a little is the smaller loss. */
+    min-height: 5.5rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* A fade at the foot of the card, but only while there is something
+       below it: the first layer is a patch of the card's own background
+       pinned to the *content*, so it covers the second layer's haze until
+       the content scrolls up past it. When nothing overflows, nothing
+       shows. */
+    background-image: linear-gradient(to top, var(--surface), var(--surface)),
+      linear-gradient(to top, color-mix(in srgb, var(--ink) 16%, transparent), transparent);
+    background-position: bottom, bottom;
+    background-size: 100% 1.25rem;
+    background-repeat: no-repeat;
+    background-attachment: local, scroll;
+  }
+}
+
+/*
  * The stage is the one piece of the page allowed a flourish: a double
  * hairline rim, the way a compact has a rim, and nothing else. Everything
  * around it stays flat.
@@ -691,20 +756,37 @@ dl {
  */
 
 .shade-card {
-  margin-top: 1.25rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
+  /* Close enough to the control bar to read as part of the stage's own
+     lockup rather than as a third, unrelated panel, and rimmed like the
+     stage so the two look cut from one piece. */
+  margin-top: 0.75rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
   background: var(--surface);
   padding: 0.9rem 1rem;
 }
 
 .shade-card__title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-family: var(--font-mono);
   font-size: var(--step--2);
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--ink-3);
   margin-bottom: 0.7rem;
+}
+
+/* The same live dot the stage's readout carries, for the same reason: what
+   follows is the state of the face right now, not a saved list. */
+.shade-card__title::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--carmine);
 }
 
 .shade-card__list dd {
