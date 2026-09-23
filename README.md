@@ -298,7 +298,7 @@ committed, and some tests read that output:
 | --- | --- |
 | `scripts/benchmark.py` | `reports/benchmark.json`: every `ms_per_image` moves with machine load. The quality figures were measured with OpenCV 4.13, which reproduces them exactly; a fresh install gets OpenCV 4.14, which moves some baseline cells in the third decimal (Carmine's own row holds at the published precision) |
 | `scripts/stability_bench.py` | `reports/benchmark.json`: only `video_ms_per_frame` moves |
-| `scripts/verify_site.py --with-parity` | `reports/browser_metrics.json`: the SwiftShader timing, and the end-to-end row by a few thousandths (a run today gives a worst mean of 2.715 against the committed 2.717), which `tests/test_docs_numbers.py` pins, so `pytest` goes red. Pass `--metrics-out` elsewhere to keep the committed file |
+| `scripts/verify_site.py --with-parity` | `reports/browser_metrics.json`: the SwiftShader timing, and the end-to-end row by a few thousandths (runs today give a worst mean of 2.7155 against the committed 2.7170), which `tests/test_docs_numbers.py` pins, so `pytest` goes red. Pass `--metrics-out` elsewhere to keep the committed file |
 | `scripts/verify_site.py --timing-only` | `reports/browser_metrics.json`: the published 26.6 ms, which `tests/test_docs_numbers.py` pins, so `pytest` goes red |
 | `scripts/make_figures.py` | its three figures: the same pictures, but each PNG records the local matplotlib version, and two come out a pixel or two wider |
 | `scripts/build_notebook.py` | without `--execute`, the notebook written back with no outputs; with it, new timestamps and log lines |
