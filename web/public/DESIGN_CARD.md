@@ -177,7 +177,8 @@ rather than a passing test.
 **Data handling.** No image, frame, landmark or capture leaves the device. The
 browser build only ever requests files from its own origin: the page on load,
 then the model and its wasm runtime the first time the mirror or a photo needs
-them. After that it makes no requests at all — type is set in system fonts and
+them, and the sample portrait (`demo/model.jpg`, one image) only if the viewer
+asks for it. Nothing else is ever requested — type is set in system fonts and
 there is no analytics — so the claim is verifiable from the Network panel, or by
 turning the network off once the mirror is running and carrying on. The Python
 engine touches the network exactly once,

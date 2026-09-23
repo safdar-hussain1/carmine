@@ -320,9 +320,10 @@ on a phone would cost more than every colour operation combined.
 model and the wasm runtime are served from the same origin instead of a CDN,
 type is set in system fonts, and there are no analytics: every request the page
 makes goes to its own site, and once the mirror has loaded its model (the first
-time you open it) it makes **no** further requests. Open the Network panel,
-reload, open the mirror, then change shades and capture: the list stops
-growing. Or turn the network off once the mirror is running and keep using it.
+time you open it) it makes **no** further requests, apart from the sample
+portrait (one photo from the same site) if you press that button. Open the
+Network panel, reload, open the mirror, then change shades and capture: the
+list stops growing. Or turn the network off once the mirror is running and keep using it.
 Captures save through your own browser's download; nothing is written anywhere
 else.
 

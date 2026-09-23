@@ -393,8 +393,8 @@ void main() {
         <p class="lede">
           That is a claim about network traffic, so here is how to check it rather than take it on
           trust: every request this page makes goes to this site, and once the mirror has loaded its
-          face model it makes none at all &mdash; no fonts, no analytics, and never your camera
-          frames.
+          face model it makes none, except for the sample portrait if you ask for it &mdash; no
+          fonts, no analytics, and never your camera frames.
         </p>
       </div>
       <div class="privacy">
@@ -414,7 +414,9 @@ void main() {
             <li>Reload this page and open the mirror. The face model and the wasm runtime that
               runs it load now, from this site.</li>
             <li>Change shades, drag the before/after split, capture a photo.</li>
-            <li>Nothing more is requested: the list stops growing once the model has loaded.</li>
+            <li>Nothing more is requested: the list stops growing once the model has loaded. The
+              only optional extra is the sample portrait, one photo from this site, if you press
+              Sample portrait.</li>
           </ol>
           <p>Or the blunter version: once the mirror is running, switch your network off and keep
             using it.</p>
