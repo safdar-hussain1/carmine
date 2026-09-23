@@ -401,9 +401,10 @@ What they pin, beyond the usual:
   additive shift that fools containment — so the published metrics are pinned
   against the blind spots they were designed around, and the committed
   benchmark's own orderings and schema are re-checked on every run.
-- **Published numbers.** `tests/test_docs_numbers.py` derives the figures this
-  README and the design card quote from the two JSON reports and fails if the
-  prose stops matching.
+- **Published numbers.** `tests/test_docs_numbers.py` derives the headline
+  figures this README and the design card quote (containment, lip-lightness
+  shift, both parity rows and their ratio, the live frame time) from the two
+  JSON reports and fails if the prose stops matching.
 - **The published page.** `tests/test_published_site.py` checks the page
   template and the committed build for the search and link-preview metadata,
   the one `<h1>`, the sitemap, the 1200×630 link-preview image and the
