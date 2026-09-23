@@ -1,14 +1,20 @@
 # Carmine
 
+[![tests](https://github.com/safdar-hussain1/carmine/actions/workflows/tests.yml/badge.svg)](https://github.com/safdar-hussain1/carmine/actions/workflows/tests.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 **Virtual makeup that leaves the skin looking like skin.** Carmine tints lips,
 eyes, brows and cheeks in CIELAB, so the face keeps its own texture, highlights
-and shadow instead of flattening into a sticker of solid colour.
+and shadow instead of flattening into a sticker of solid colour. The same
+algorithm ships twice: a Python engine and CLI for photos and video, and a live
+mirror that runs on your camera in the browser, checked against the Python
+renders on every build.
 
 **[Try the live mirror →](https://safdar-hussain1.github.io/carmine/)**
 Your camera, in your browser. No upload, no account, and every file it needs
 comes from the page's own site.
 
-![Four preset looks applied to a portrait](reports/figures/presets_demo.png)
+![The mirror with the sample portrait split before and after the velvet look](web/public/og-image.png)
 
 ---
 
@@ -25,7 +31,7 @@ One algorithm, two surfaces.
 | **Masks** | full resolution, true Gaussian feathers | half resolution, box-approximated |
 
 The browser is not a lookalike port. It is checked against the Python engine's
-own renders, in a real browser, in CIELAB ΔE, on every build — see
+own renders, in a real browser, in CIELAB ΔE — see
 [Parity](#parity-two-implementations-one-algorithm).
 
 ![Every product mask drawn from the same 478 landmarks](reports/figures/masks_demo.png)
@@ -47,10 +53,12 @@ Three stages, both surfaces:
 3. **Tint in CIELAB** — [`carmine/pigment.py`](src/carmine/pigment.py) /
    [`web/src/engine/pigment.ts`](web/src/engine/pigment.ts). Chroma (a, b)
    moves toward the shade; lightness (L) is pulled at most a capped fraction
-   of the way — 0.30 for matte lipstick, 0.35 otherwise, 0.15 blush, 0.10
-   highlighter. That cap is the whole trick. Eyeliner is the deliberate
-   exception: a flat opaque paint, because covering what is underneath is the
-   job.
+   of the way — 0.30 for matte lipstick and 0.35 for satin or gloss, 0.30
+   eyeshadow, 0.20 brows, 0.15 blush, 0.10 highlighter. That cap is the whole
+   trick. Eyeliner is the deliberate exception: a flat opaque paint, because
+   covering what is underneath is the job.
+
+![The four presets on a public-domain portrait](reports/figures/presets_demo.png)
 
 The full write-up — pipeline demos, metric design, every negative result — is
 in [`notebooks/01_engine_and_benchmarks.ipynb`](notebooks/01_engine_and_benchmarks.ipynb),
@@ -180,74 +188,120 @@ never the thing parity is measured against.
 
 ```bash
 git clone https://github.com/safdar-hussain1/carmine.git
-cd virtual-makeup
-pip install -e .          # add [dev] for pytest + scikit-image
-```
-
-Python 3.10+. On first use the FaceLandmarker model (~3.8 MB, Apache-2.0) is
-downloaded to `~/.cache/carmine/` and checked against a pinned sha256. To skip
-the download entirely, point `CARMINE_MODEL` at the copy already in this
-repository:
-
-```bash
+cd carmine
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"      # [dev] adds pytest and scikit-image; plain `-e .` is enough to run it
 export CARMINE_MODEL="$PWD/web/public/models/face_landmarker.task"
+carmine looks                # prints the four presets if the install worked
 ```
 
-## CLI
+Python 3.10 to 3.14: CI runs 3.12 and 3.13 on Linux, and a clean install on
+macOS passes the suite on all five. The engine needs the MediaPipe FaceLandmarker model (~3.8 MB,
+Apache-2.0). It ships in this repository, and `CARMINE_MODEL` points the engine
+at it. Without that variable the first run downloads the same file to
+`~/.cache/carmine/` and checks it against a pinned sha256.
+
+For the browser mirror you also need Node.js (CI uses 22): `cd web && npm ci`.
+
+**If something fails:**
+
+- `error: Failed to download the FaceLandmarker model … CERTIFICATE_VERIFY_FAILED`
+  — Python from the python.org macOS installer has no CA certificates until you
+  run `Install Certificates.command` from its folder in Applications. Or skip
+  the download: set `CARMINE_MODEL` as above.
+- `ModuleNotFoundError: No module named 'carmine'` right after
+  `pip install -e .` — some virtualenv setups do not pick up the editable
+  install. Put the source on the path for that shell instead:
+  `export PYTHONPATH=src` from the repository root.
+
+## Every command
+
+Run from the repository root with the virtualenv active. `IN`/`OUT` are your
+own files; `web/public/demo/model.jpg` is a sample portrait to try.
 
 ```bash
-carmine looks                                   # list the four presets
-carmine looks --json                            # ... as Look JSON
+# --- the CLI (also runs as `python -m carmine ...`) -----------------------------
+carmine looks                                    # the presets: bare, everyday, glass, velvet
+carmine looks --json                             # the same as Look JSON, the format --look-json reads
 
-carmine apply portrait.jpg out.jpg --preset velvet
-carmine apply portrait.jpg out.jpg \
+carmine apply IN.jpg OUT.jpg --preset velvet     # --preset bare | everyday | glass | velvet
+carmine apply IN.jpg OUT.jpg --look-json look.json
+carmine apply IN.jpg OUT.jpg --preset bare \
     --lipstick '#8E1B3A' --lipstick-intensity 0.85 --lipstick-finish matte \
-    --blush '#D96C6C' --smoothing 0.25
-carmine apply portrait.jpg out.jpg --look-json my_look.json
+    --eyeshadow '#5C3A6E' --eyeshadow-intensity 0.5 \
+    --eyeliner '#1B1B1B' --eyeliner-intensity 0.8 \
+    --brows '#4A3728' --brows-intensity 0.35 \
+    --blush '#D96C6C' --blush-intensity 0.35 \
+    --highlighter '#F5D9C8' --highlighter-intensity 0.6 \
+    --smoothing 0.25
+#   colours are #RRGGBB; intensities and --smoothing are 0 to 1;
+#   --lipstick-finish matte | satin | gloss. A colour without its -intensity
+#   flag turns that product on at 0.7, or keeps the preset's own intensity.
+#   Without --preset or --look-json every product starts switched off.
 
-carmine video clip.mp4 out.mp4 --preset glass    # per-frame, source fps/size
-carmine video clip.mp4 out.mp4 --preset glass --no-smooth-landmarks
+carmine video IN.mp4 OUT.mp4 --preset glass      # every frame, at the source fps and size
+carmine video IN.mp4 OUT.mp4 --look-json look.json --no-smooth-landmarks
+carmine landmarks IN.jpg OUT.jpg                 # the 478 detected points as dots, a debug aid
 
-carmine landmarks portrait.jpg dots.jpg          # 478 points, as a debug aid
+# --- the Python API ----------------------------------------------------------------
+python -c "import cv2; from carmine import apply_look, PRESETS; cv2.imwrite('out.jpg', apply_look(cv2.imread('web/public/demo/model.jpg'), PRESETS['velvet']))"
+
+# --- tests ---------------------------------------------------------------------------
+pytest                                           # 256 tests; the 5 that need the private dataset skip without it
+(cd web && npx vitest run)                       # 76 tests of the browser engine
+(cd web && npx tsc --noEmit)                     # type-check
+python scripts/verify_site.py                    # the built site's own selftest, 9 checks, in headless Chrome
+python scripts/verify_site.py --url 'https://safdar-hussain1.github.io/carmine/?selftest=1'   # ... on the live site
+python scripts/mutation_battery.py               # breaks 12 claims one at a time; needs a clean git tree
+
+# --- the browser mirror --------------------------------------------------------------
+(cd web && npm run dev)                          # dev server with live reload, http://localhost:5173
+(cd web && npm run build)                        # writes docs/, the site GitHub Pages serves
+python3 -m http.server 8000 --directory docs     # the built site at http://localhost:8000
+
+# --- regenerate what the repository commits (see the table below first) --------------
+python scripts/export_constants.py               # web/src/gen/constants.json, from the Python source
+python scripts/export_test_vectors.py            # web/src/gen/test_vectors.json, from the Python engine
+python scripts/make_figures.py                   # reports/figures/: benchmark_metrics, presets_demo, opacity_compare
+python scripts/preview_masks.py                  # reports/figures/masks_demo.png
+python scripts/make_demo_portrait.py             # web/public/demo/portrait.jpg, the selftest's fixed frame
+python scripts/stability_bench.py                # reports/benchmark.json "stability"   [--out DIR]
+python scripts/benchmark.py                      # reports/benchmark.json "photo"; needs data/no_makeup/   [--dataset DIR --out DIR --max-side N]
+python scripts/export_parity_fixtures.py         # reports/parity_fixtures/ (git-ignored); needs data/no_makeup/   [--dataset DIR --out DIR]
+python scripts/verify_site.py --with-parity      # parity and SwiftShader timing into reports/browser_metrics.json   [--metrics-out PATH]
+python scripts/verify_site.py --timing-only      # timing on the real GPU, added to the same file as timing_hardware
+pip install nbclient ipykernel && python scripts/build_notebook.py --execute   # the notebook, written and run
+python scripts/make_og_image.py                  # web/public/og-image.png, the link-preview picture; build again after
 ```
 
-A `--<product>` colour without a matching `--<product>-intensity` turns that
-product on at 0.7, unless the base preset already gave it a non-zero
-intensity. User-facing problems (missing file, bad hex, no face) exit 2 with a
-single `error: …` line — never a traceback.
+`verify_site.py` also takes `--timeout SECONDS` (default 120; 900 for
+`--with-parity` and `--timing-only`) and `--expect-checks N` (default 9; `0` turns the count check
+off). `make_og_image.py` takes `--theme light|dark` and `--out PATH`.
 
-## Python
+**Why the built site needs a server.** `docs/index.html` loads its script as an
+ES module and its stylesheet with `crossorigin`, and fetches the face model and
+the wasm runtime when the mirror opens. Browsers refuse all of that from a
+`file://` page, so opening the file directly shows an unstyled headline and
+nothing else. Any static server works; the one above ships with Python.
 
-```python
-import cv2
-from carmine.engine import apply_look, VideoEngine
-from carmine.look import PRESETS, Look, Product
+**Commands that rewrite committed files.** Most of the list above is safe to
+run at any time. These are not, because their output differs from what is
+committed, and some tests read that output:
 
-image = cv2.imread("portrait.jpg")                  # BGR uint8
-out = apply_look(image, PRESETS["velvet"])          # detects landmarks for you
-cv2.imwrite("out.jpg", out)
+| command | what changes |
+| --- | --- |
+| `scripts/benchmark.py` | `reports/benchmark.json`: every `ms_per_image` moves with machine load |
+| `scripts/stability_bench.py` | `reports/benchmark.json`: `video_ms_per_frame` moves |
+| `scripts/verify_site.py --with-parity` | `reports/browser_metrics.json`: the SwiftShader timing block moves; pass `--metrics-out` elsewhere to keep the committed file |
+| `scripts/verify_site.py --timing-only` | `reports/browser_metrics.json`: the published 26.6 ms, which `tests/test_docs_numbers.py` pins, so `pytest` goes red |
+| `scripts/build_notebook.py` without `--execute` | the notebook, written back without any outputs |
+| `scripts/make_og_image.py` | `web/public/og-image.png`, a fresh screenshot every run |
 
-look = Look(
-    lipstick=Product("#8E1B3A", intensity=0.85, finish="matte"),
-    blush=Product("#D96C6C", intensity=0.35),
-    smoothing=0.25,
-)
-out = apply_look(image, look)
+`git checkout -- <path>` puts any of them back. Everything else in the list
+reproduces the committed bytes; the tests check that for the two generated
+JSON files.
 
-engine = VideoEngine(look, smooth_landmarks=False)   # per-frame, filtered stream
-frame_out = engine.process(frame, timestamp_ms=33)
-```
-
-Pass `landmarks=` to `apply_look` to reuse a detection across looks — the
-detector, not the pigment, is the expensive part.
-
-## The Mirror
-
-```bash
-cd web && npm install
-npm run dev            # local dev server
-npm run build          # emits docs/, which GitHub Pages serves
-```
+## The mirror
 
 What runs where: the camera frame goes from the video element into a GPU
 texture and back to a canvas. The only data crossing into JavaScript is 478
@@ -269,10 +323,10 @@ The built site carries its own acceptance test. Load it with `?selftest=1` and
 the tab title reports the result — `SELFTEST PASS n=9 skipped=2` on the
 deployed site, where the two parity checks have no fixtures to compare against
 and say so rather than passing quietly. `python scripts/verify_site.py`
-drives that headlessly and fails the build if the count changes. The nine
-checks include the ones only a browser can run — a real driver compiling the
-fragment shader, the wasm landmarker actually finding a face in the bundled
-portrait, and the parity comparison against the Python renders.
+drives that headlessly and fails if the count changes. The nine checks include
+the ones only a browser can run — a real driver compiling the fragment shader,
+the wasm landmarker actually finding a face in the bundled portrait, and the
+parity comparison against the Python renders.
 
 Public cards, served with the site:
 [design and measured claims](web/public/DESIGN_CARD.md) ·
@@ -283,22 +337,27 @@ Public cards, served with the site:
 ```
 src/carmine/          the engine: landmarks, regions, masks, pigment, look, engine, cli
                       plus baselines.py (failure modes) and metrics.py (scorers)
+web/index.html        the page template: head, search and link-preview metadata
 web/src/engine/       the browser port: masks, pigment, colour, blur, look, renderer
-web/src/ui/           the Mirror: stage, shade rail, measured section, pipeline
+web/src/ui/           the mirror: stage, shade rail, measured section, pipeline
+web/src/lib/          landmarker, camera, selftest, parity and timing harnesses
 web/src/gen/          constants.json + test_vectors.json, generated from Python
-web/public/           bundled model, wasm, demo portrait, DESIGN_CARD, ARCHITECTURE
-scripts/              benchmark, stability_bench, figures, constants/fixture export,
-                      verify_site (headless browser), build_notebook
-tests/                235 pytest tests
+web/public/           bundled model and wasm, demo portraits, favicon, og-image,
+                      sitemap, DESIGN_CARD, ARCHITECTURE
+scripts/              benchmark, stability_bench, figures, mask preview, demo portrait,
+                      constants/vector/fixture export, verify_site (headless browser),
+                      build_notebook, mutation_battery, make_og_image
+tests/                256 pytest tests
 notebooks/            the executed engineering write-up
 reports/              benchmark.json, browser_metrics.json, figures/
 docs/                 the built site (GitHub Pages)
+.github/workflows/    CI: tests.yml
 ```
 
 ## Tech stack
 
-**Python** 3.10+ · NumPy · OpenCV · MediaPipe Tasks · scikit-image (metrics,
-demo portrait) · pytest.
+**Python** 3.10–3.14 · NumPy · OpenCV · MediaPipe Tasks · scikit-image
+(metrics, demo portrait) · pytest.
 **Web** TypeScript · Vite · WebGL2 (one fragment pass) ·
 `@mediapipe/tasks-vision` wasm · vitest. No UI framework, no CSS framework, no
 runtime dependency beyond the landmarker.
@@ -306,16 +365,25 @@ runtime dependency beyond the landmarker.
 ## Tests
 
 ```bash
-PYTHONPATH=src pytest                  # 235 tests
-cd web && npx vitest run               # 76 tests
-python scripts/verify_site.py          # headless browser selftest, 9 checks
+pytest                                  # 256 tests
+(cd web && npx vitest run)              # 76 tests
+python scripts/verify_site.py           # headless browser selftest, 9 checks
 ```
+
+**CI** ([`.github/workflows/tests.yml`](.github/workflows/tests.yml)) runs on
+every push and pull request to `main`: `pytest` on Python 3.12 and 3.13, and a
+web job that runs `npm ci`, vitest, the type-check and the production build,
+then fails if the build differs from the committed `docs/`. Two things it does
+not run: the five parity-fixture tests, which render from the private
+portrait dataset and skip without it (251 pass, 5 skip), and
+`scripts/verify_site.py`, which needs Chrome with WebGL2 and is run locally
+before publishing. No test needs a camera.
 
 What they pin, beyond the usual:
 
 - **Cross-surface parity.** `tests/test_parity_report.py` validates the
   committed `browser_metrics.json` against the same ΔE gates the browser
-  enforces, and never skips — a stale number cannot survive a rewrite of the
+  enforces, and never skips — a stale number cannot survive a change to the
   code that produced it. `web/src/gen/test_vectors.json` holds Python-produced
   vectors that the TypeScript engine is checked against unit by unit.
 - **Constants cannot drift.** `tests/test_constants_sync.py` regenerates
@@ -326,6 +394,13 @@ What they pin, beyond the usual:
   additive shift that fools containment — so the published metrics are pinned
   against the blind spots they were designed around, and the committed
   benchmark's own orderings and schema are re-checked on every run.
+- **Published numbers.** `tests/test_docs_numbers.py` derives the figures this
+  README and the design card quote from the two JSON reports and fails if the
+  prose stops matching.
+- **The published page.** `tests/test_published_site.py` checks the page
+  template and the committed build for the search and link-preview metadata,
+  the one `<h1>`, the sitemap, the 1200×630 link-preview image and the
+  authorship marks.
 - **Repository hygiene.** `tests/test_guards.py` scans every tracked text file
   for leaked absolute paths and stray process documents. It scans this README,
   the notebook and the cards too.

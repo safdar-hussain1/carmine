@@ -19,7 +19,6 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest", "scikit-image"]
-bench = ["dlib"]
 
 [project.scripts]
 carmine = "carmine.cli:main"
