@@ -242,8 +242,9 @@ def lip_luminance_shift(before: np.ndarray, after: np.ndarray, lip_mask: np.ndar
             above 0.5 mark the lip region scored.
 
     Returns:
-        A float >= 0, in Lab-L units (0-100 scale). Lower is better; 0.0
-        means the region's mean lightness is unchanged.
+        A float >= 0 on OpenCV's 8-bit L scale: `cvtColor` on uint8 input
+        stores L* (0-100) as 0-255, so 255 here is L* = 100. Lower is better;
+        0.0 means the region's mean lightness is unchanged.
 
     Raises:
         ValueError: If `lip_mask` selects no pixels.

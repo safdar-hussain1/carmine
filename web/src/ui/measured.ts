@@ -92,7 +92,7 @@ const METRICS: MetricSpec[] = [
   {
     key: "lip_luminance_shift",
     title: "Lip lightness shift",
-    what: "How far mean lip brightness moves, in Lab-L units.",
+    what: "How far mean lip brightness moves, in 8-bit Lab-L units (0–255).",
     better: "lower",
     format: units,
   },

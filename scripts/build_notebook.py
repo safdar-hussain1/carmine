@@ -354,7 +354,7 @@ table(["method (this portrait)", "texture kept", "detail ratio", "|ΔL| lip"], r
 shift_carmine = metrics.lip_luminance_shift(PORTRAIT, CARMINE_OUT, lip)
 shift_fill = metrics.lip_luminance_shift(PORTRAIT, FILL_OUT, lip)
 # The signature of a fill is a large mean-lightness move. That direction is
-# what the 26-image benchmark measures too (13.2 vs 45.7 Lab-L units); this
+# what the 26-image benchmark measures too (13.2 vs 45.7 on the 0-255 L scale); this
 # single portrait is an illustration of it, not a second measurement of it.
 assert shift_fill > 2 * shift_carmine, (shift_carmine, shift_fill)
 print(f"\\nlip |ΔL| on this portrait: carmine {shift_carmine:.1f} vs opaque_fill {shift_fill:.1f}")
@@ -576,15 +576,15 @@ table(["method", "|ΔL| lip", "min – max over 26"], rows)
 fill_shift = close(PHOTO["opaque_fill"]["lip_luminance_shift"], 45.7, 0.05)
 carmine_shift = close(PHOTO["carmine"]["lip_luminance_shift"], 13.2, 0.05)
 print(f"\\nthe fill moves mean lip lightness {fill_shift / carmine_shift:.1f}x further "
-      "than the tint, on a 0-100 scale")
+      "than the tint (OpenCV's 8-bit L scale, 0-255)")
 '''
 )
 
 md(
     """
-45.7 against 13.2 Lab-L units — the fill moves mean lip brightness three and
-a half times further, and half the 0–100 lightness scale is a lip that no
-longer matches the face it is on. This is the number that catches what the
+45.7 against 13.2 on OpenCV's 8-bit lightness scale (0–255, where 255 is
+L* = 100) — the fill moves mean lip brightness three and a half times further,
+and a lip that much brighter than it was no longer matches the face it is on. This is the number that catches what the
 containment and correlation metrics structurally cannot, and it is why the
 figure `reports/figures/opacity_compare.png` exists next to it: the failure
 is visible at the pixel level too.

@@ -15,7 +15,8 @@ which says so.
 ## C1 — Texture survives the pigment
 
 **Number.** Lip texture correlation **0.988**, the highest of the five methods
-benchmarked. Mean lip-lightness shift **13.2** Lab-L units, against **45.7**
+benchmarked. Mean lip-lightness shift **13.2** units on OpenCV's 8-bit L scale
+(0–255, where 255 is L* = 100), against **45.7**
 for an opaque fill of the same region under the same look — 3.5× less
 disturbance of the face's own brightness.
 

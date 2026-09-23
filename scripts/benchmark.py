@@ -111,7 +111,8 @@ PROTOCOL = {
     ),
     "lip_luminance_shift": (
         "abs(mean(L_after) - mean(L_before)) inside the lip mask (threshold "
-        "0.5), in Lab-L units; lower is better. Some shift is inherent to "
+        "0.5), on OpenCV's 8-bit Lab-L scale (0-255, where 255 is L* = 100); "
+        "lower is better. Some shift is inherent to "
         "applying any pigment at all -- the signature of additive/opaque "
         "compositing specifically is a LARGE shift, since that compositing "
         "path has no mechanism holding mean brightness close to the "
@@ -283,7 +284,7 @@ def main() -> int:
     lip_luminance_shift_note = (
         "measured ranking, lowest (best) to highest shift: "
         + ", ".join(f"{m}={luminance_by_method[m]:.2f}" for m in ranked_luminance)
-        + " (Lab-L units, 0-100 scale). Published as measured; not tuned to make any "
+        + " (OpenCV 8-bit Lab-L units, 0-255 scale). Published as measured; not tuned to make any "
         "particular method win."
     )
 

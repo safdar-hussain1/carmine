@@ -104,10 +104,10 @@ Three caveats, because the table alone would flatter:
   depressed by design — the lightness-pull cap scales down high-frequency L
   variance by about that fraction — and it is published as measured.
 
-**Where the fill actually fails is brightness.** 45.7 against 13.2 Lab-L units
-of mean lip-lightness shift: the fill moves the lip 3.5× further on a 0–100
-scale, which is what a lip that no longer matches the face it is on looks like
-numerically.
+**Where the fill actually fails is brightness.** 45.7 against 13.2 units of
+mean lip-lightness shift, on OpenCV's 8-bit L scale (0–255, where 255 is
+L* = 100): the fill moves the lip 3.5× further, which is what a lip that no
+longer matches the face it is on looks like numerically.
 
 ![Same lip region, hard fill versus texture-preserving tint](reports/figures/opacity_compare.png)
 
