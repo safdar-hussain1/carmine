@@ -121,7 +121,9 @@ the other fails the Python suite — before it can reach a browser.
 Python-computed inputs and outputs (colour conversions, mask samples, pigment
 results) as `web/src/gen/test_vectors.json`, which the vitest suite asserts
 against unit by unit. Constants keep the two sides configured identically;
-vectors keep them *computing* identically.
+vectors keep them *computing* identically. The sync test compares the vectors
+as data rather than bytes — integers exactly, floats to 1e-3 — because the
+float32 colour conversion rounds differently on another CPU.
 
 `scripts/export_parity_fixtures.py` writes the third layer: canned frames,
 their landmarks, and the Python engine's own renders under three looks. Those

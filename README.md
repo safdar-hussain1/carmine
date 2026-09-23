@@ -252,7 +252,7 @@ carmine landmarks IN.jpg OUT.jpg                 # the 478 detected points as do
 python -c "import cv2; from carmine import apply_look, PRESETS; cv2.imwrite('out.jpg', apply_look(cv2.imread('web/public/demo/model.jpg'), PRESETS['velvet']))"
 
 # --- tests ---------------------------------------------------------------------------
-pytest                                           # 256 tests; the 5 that need the private dataset skip without it
+pytest                                           # 257 tests; the 5 that need the private dataset skip without it
 (cd web && npx vitest run)                       # 76 tests of the browser engine
 (cd web && npx tsc --noEmit)                     # type-check
 python scripts/verify_site.py                    # the built site's own selftest, 9 checks, in headless Chrome
@@ -354,7 +354,7 @@ web/public/           bundled model and wasm, demo portraits, favicon, og-image,
 scripts/              benchmark, stability_bench, figures, mask preview, demo portrait,
                       constants/vector/fixture export, verify_site (headless browser),
                       build_notebook, mutation_battery, make_og_image
-tests/                256 pytest tests
+tests/                257 pytest tests
 notebooks/            the executed engineering write-up
 reports/              benchmark.json, browser_metrics.json, figures/
 docs/                 the built site (GitHub Pages)
@@ -372,7 +372,7 @@ runtime dependency beyond the landmarker.
 ## Tests
 
 ```bash
-pytest                                  # 256 tests
+pytest                                  # 257 tests
 (cd web && npx vitest run)              # 76 tests
 python scripts/verify_site.py           # headless browser selftest, 9 checks
 ```
@@ -382,7 +382,7 @@ every push and pull request to `main`: `pytest` on Python 3.12 and 3.13, and a
 web job that runs `npm ci`, vitest, the type-check and the production build,
 then fails if the build differs from the committed `docs/`. Two things it does
 not run: the five parity-fixture tests, which render from the private
-portrait dataset and skip without it (251 pass, 5 skip), and
+portrait dataset and skip without it (252 pass, 5 skip), and
 `scripts/verify_site.py`, which needs Chrome with WebGL2 and is run locally
 before publishing. No test needs a camera.
 
@@ -394,8 +394,11 @@ What they pin, beyond the usual:
   code that produced it. `web/src/gen/test_vectors.json` holds Python-produced
   vectors that the TypeScript engine is checked against unit by unit.
 - **Constants cannot drift.** `tests/test_constants_sync.py` regenerates
-  `web/src/gen/constants.json` from the Python source and diffs it, so a
-  feather radius changed on one side and not the other is a red build.
+  `web/src/gen/constants.json` from the Python source and diffs it byte for
+  byte, so a feather radius changed on one side and not the other is a red
+  build. It regenerates `test_vectors.json` too and compares it as data:
+  integers exact, floats to 1e-3, because OpenCV's float32 colour conversion
+  and the filter arithmetic round differently on another CPU.
 - **Metric falsification.** `tests/test_metrics.py` feeds each scorer the case
   it is supposed to catch — a flat fill that fools a correlation metric, an
   additive shift that fools containment — so the published metrics are pinned

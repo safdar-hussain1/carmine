@@ -5,9 +5,10 @@ One-Euro filter in TypeScript. Reimplementations drift, and a TypeScript
 test can only ever check TypeScript against itself -- so the numbers the
 vitest suite compares against are produced *here*, by the real OpenCV /
 NumPy code paths in `carmine`, and committed alongside the generated
-constants. `tests/test_constants_sync.py` regenerates this file and asserts
-byte-for-byte equality, so a Python-side change that moves any of these
-numbers fails loudly in pytest instead of silently invalidating the
+constants. `tests/test_constants_sync.py` regenerates this file and compares
+it with the committed copy -- integers exactly, floats to a tolerance that
+absorbs another CPU's rounding -- so a Python-side change that moves any of
+these numbers fails loudly in pytest instead of silently invalidating the
 TypeScript tests.
 
 Every array of image pixels in this file is RGB (not the BGR that
