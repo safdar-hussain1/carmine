@@ -22,14 +22,16 @@ The demo renders use `skimage.data.astronaut` (a public-domain NASA
 portrait), so no photo of a private individual is committed.
 
 Usage:
-    PYTHONPATH=src python scripts/build_notebook.py            # write only
-    PYTHONPATH=src python scripts/build_notebook.py --execute  # write + run
+    python scripts/build_notebook.py            # write only (no outputs)
+    python scripts/build_notebook.py --execute  # write + run
 
-`--execute` runs the notebook through nbclient with the `ghvenv` kernel
-(override with `--kernel`), which is equivalent to:
+`--execute` needs `pip install nbclient ipykernel` and runs the notebook
+through nbclient with the `python3` kernel -- the Python that runs this
+script, when ipykernel is installed in it (override with `--kernel`). It is
+equivalent to:
 
     jupyter nbconvert --to notebook --execute --inplace \
-        --ExecutePreprocessor.kernel_name=ghvenv \
+        --ExecutePreprocessor.kernel_name=python3 \
         notebooks/01_engine_and_benchmarks.ipynb
 """
 
@@ -906,7 +908,7 @@ def build() -> dict:
     return {
         "cells": cells,
         "metadata": {
-            "kernelspec": {"display_name": "ghvenv", "language": "python", "name": "ghvenv"},
+            "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
             "language_info": {"name": "python", "pygments_lexer": "ipython3"},
         },
         "nbformat": 4,
@@ -934,7 +936,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, default=OUTPUT_PATH)
     parser.add_argument("--execute", action="store_true", help="run the notebook after writing it")
-    parser.add_argument("--kernel", default="ghvenv", help="kernel name for --execute")
+    parser.add_argument("--kernel", default="python3", help="kernel name for --execute")
     args = parser.parse_args()
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
