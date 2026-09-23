@@ -242,8 +242,8 @@ void main() {
         <div>
           <h3>The smoothing result was a null result.</h3>
           <p>
-            One-Euro filtering was expected to steady the landmark stream. On a held-still clip it
-            did not: the best configuration that stayed within the deviation constraint cut
+            One-Euro filtering was expected to steady the landmark stream. On a slow, nearly still
+            test clip it did not: the best configuration that stayed within the deviation constraint cut
             motion-compensated jitter by only
             ${n.jitter_reduction_pct.toFixed(1)}%, under the
             ${n.grid_search.improvement_threshold_pct.toFixed(0)}% threshold set before the

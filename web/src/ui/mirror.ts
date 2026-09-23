@@ -273,7 +273,7 @@ export function createMirror(options: MirrorOptions): Mirror {
 
     if (steady && mirrored) {
       // Smoothing is a preference, not a fix: our own stability measurements
-      // (see the Measured section) found no benefit on a held-still clip.
+      // (see the Measured section) found no benefit on a slow, nearly still clip.
       // It is only applied to the live stream -- a still photo has nothing
       // to smooth across.
       landmarks = Float32Array.from(filter.filter(landmarks, timestampMs / 1000));
