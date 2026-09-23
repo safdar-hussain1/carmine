@@ -83,7 +83,7 @@ Nothing crosses between the surfaces at runtime. They meet only at build time
 | `engine/pigment.ts` | the CPU reference port — what parity is measured against |
 | `engine/renderer.ts` | the WebGL2 single-pass shader — the live path |
 | `engine/look.ts` | presets and product order, read from generated constants |
-| `engine/oneEuro.ts` | the filter port, opt-in |
+| `engine/oneEuro.ts` | the filter port; on by default, behind the Steady button |
 | `lib/landmarks.ts` | wasm landmarker lifecycle, one instance per page |
 | `lib/parity.ts` | CPU / GPU / end-to-end ΔE comparisons against fixtures |
 | `lib/timing.ts` | per-stage frame cost, medians, fenced draw |

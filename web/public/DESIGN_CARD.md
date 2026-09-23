@@ -149,8 +149,10 @@ to both cut jitter by >20% and not inflate deviation from ground truth beyond
 
 **Caveat.** The clip is clean by construction, and a clean stream is exactly
 where a smoothing filter should be expected to lose — it can only add lag.
-This result says smoothing is an opt-in for genuinely jittery cameras, not
-that the filter is useless. Ground truth is anchored to a real frame-0
+This result says smoothing pays off only on genuinely jittery cameras, not
+that the filter is useless. It stays on by default — `VideoEngine`, `carmine
+video` and the mirror's Steady button all start with it enabled — and one
+switch turns it off. Ground truth is anchored to a real frame-0
 detection rather than a synthetic exact position, so the absolute deviations
 are mildly optimistic; the raw-vs-filtered comparison is unaffected, since
 every stream shares that anchor.

@@ -864,8 +864,9 @@ Known limits:
   landmark geometry, and geometry does not know what is in front of it.
 * **The engine is not a shade-matching product.** It applies the colour it is
   given. It does not tell you which colour to want.
-* **The synthetic stability clip is clean.** Its conclusion — that smoothing
-  is an opt-in, not a free win — is a conclusion about clean streams. A
+* **The synthetic stability clip is clean.** Its conclusion — that smoothing,
+  which is on by default, is not a free win — is a conclusion about clean
+  streams. A
   genuinely noisy webcam is exactly where the filter that failed here would
   be expected to pay off.
 * **26 photographs is a small set**, from one paired-portrait source. The

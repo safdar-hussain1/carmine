@@ -125,7 +125,7 @@
     "selected_params": null,
     "jitter_reduction_pct": 7.556432617417588,
     "meets_improvement_threshold": false,
-    "note": "one_euro shows no measurable benefit on this clip: the best constraint-satisfying config (min_cutoff=1.5, beta=0.5) only reduced motion-compensated jitter by 7.6% (< 20% threshold). VideoEngine defaults left unchanged. For comparison, OneEuroFilter's actual shipped defaults (min_cutoff=1.0, beta=0.007) are worse than doing nothing on this clip: deviation 4.6x raw, jitter +73% vs raw. Smoothing is therefore most useful as an opt-in for genuinely jittery cameras, not a free win applied blindly -- on a clip this clean, the shipped defaults actively hurt tracking accuracy.",
+    "note": "one_euro shows no measurable benefit on this clip: the best constraint-satisfying config (min_cutoff=1.5, beta=0.5) only reduced motion-compensated jitter by 7.6% (< 20% threshold). VideoEngine defaults left unchanged. For comparison, OneEuroFilter's actual shipped defaults (min_cutoff=1.0, beta=0.007) are worse than doing nothing on this clip: deviation 4.6x raw, jitter +73% vs raw. Smoothing (on by default) therefore pays off only on genuinely jittery cameras and is not a free win -- on a clip this clean, the shipped defaults actively hurt tracking accuracy.",
     "video_ms_per_frame": 74.91020852467045,
     "n_frames": 90,
     "n_frames_with_face": 90,

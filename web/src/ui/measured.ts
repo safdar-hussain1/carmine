@@ -304,9 +304,9 @@ export function measuredSectionHtml(): string {
             more jitter.
           </p>
           <p>
-            So the engine's defaults were left alone, and the mirror's <em>Steady</em> toggle is
-            offered as a preference rather than a fix. MediaPipe's video mode is already doing this
-            job.
+            So the engine's defaults were left alone: smoothing stays on, and the mirror's
+            <em>Steady</em> toggle starts pressed, as a preference rather than a fix &mdash; switch it
+            off and compare. MediaPipe's video mode is already doing most of this job.
           </p>
         </div>
         ${stabilityChart()}

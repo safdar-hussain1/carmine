@@ -328,8 +328,8 @@ def main() -> int:
         f" For comparison, OneEuroFilter's actual shipped defaults "
         f"(min_cutoff={SHIPPED_MIN_CUTOFF}, beta={SHIPPED_BETA}) are worse than doing nothing on "
         f"this clip: deviation {shipped_deviation_ratio:.1f}x raw, jitter "
-        f"{shipped_jitter_change_pct:+.0f}% vs raw. Smoothing is therefore most useful as an "
-        "opt-in for genuinely jittery cameras, not a free win applied blindly -- on a clip this "
+        f"{shipped_jitter_change_pct:+.0f}% vs raw. Smoothing (on by default) therefore pays "
+        "off only on genuinely jittery cameras and is not a free win -- on a clip this "
         "clean, the shipped defaults actively hurt tracking accuracy."
     )
 

@@ -132,10 +132,13 @@ did not earn a default:
 Best tuned: **7.6% jitter reduction against a 20% bar.** The filter's own
 shipped defaults are worse than doing nothing on this clip — 4.6× the
 deviation from ground truth and **73% more** jitter, because a low beta lags a
-nearly-still stream. So no default was changed: smoothing stays available
-(`VideoEngine(look, smooth_landmarks=…)`, `--no-smooth-landmarks`) as an
-opt-in for genuinely jittery cameras. The clip is clean by construction, which
-is exactly the case where smoothing should be expected to lose.
+nearly-still stream. So no default was changed, and that means smoothing is
+still **on** by default, with the filter's own parameters: `VideoEngine(look)`
+and `carmine video` smooth unless given `smooth_landmarks=False` /
+`--no-smooth-landmarks`, and the mirror's Steady button starts pressed. It
+earns its place only on a genuinely jittery camera. The clip is clean by
+construction, which is exactly the case where smoothing should be expected to
+lose.
 
 ### Parity: two implementations, one algorithm
 
