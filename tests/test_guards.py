@@ -24,25 +24,6 @@ SKIP_PATHS = {
     "web/package-lock.json",
 }
 
-# A line in .gitignore that is *only* a dot-directory ignore pattern (e.g. a
-# local tool workspace folder) is infrastructure that keeps such folders out
-# of git, not prose mentioning any tool by name. Such lines are exempt from
-# the banned-words scan; everything else in .gitignore (including comments)
-# is still scanned.
-DOT_DIR_IGNORE_PATTERN = re.compile(r"^\.[A-Za-z][^ ]*/$")
-
-
-def _text_for_banned_scan(rel_path, text):
-    if rel_path != ".gitignore":
-        return text
-    kept_lines = [
-        line
-        for line in text.splitlines()
-        if not DOT_DIR_IGNORE_PATTERN.match(line.strip())
-    ]
-    return "\n".join(kept_lines)
-
-
 BANNED_WORDS = [
     "col" + "lege",
     "course" + "work",
@@ -51,6 +32,8 @@ BANNED_WORDS = [
     "Cla" + "ude",
     "Anthro" + "pic",
     "Co-Au" + "thored-By",
+    "sub" + "agent",
+    "super" + "powers",
     "/Us" + "ers/",
 ]
 
@@ -103,13 +86,12 @@ def test_private_paths_are_ignored():
 def test_no_banned_words_in_tracked_files():
     violations = []
     for rel_path, text in _iter_tracked_text_files():
-        scanned = _text_for_banned_scan(rel_path, text)
-        lowered = scanned.lower()
+        lowered = text.lower()
         for banned in BANNED_WORDS:
             if banned.lower() in lowered:
                 violations.append((rel_path, banned))
         for pattern in BANNED_WORD_PATTERNS:
-            if pattern.search(scanned):
+            if pattern.search(text):
                 violations.append((rel_path, pattern.pattern))
     assert not violations, f"banned words found in tracked files: {violations}"
 
@@ -131,14 +113,16 @@ def test_no_absolute_user_paths():
     assert not violations, f"absolute user paths found in tracked files: {violations}"
 
 
+# Assembled from fragments where the literal would itself be a trace of the
+# private tooling this guard keeps out.
 PROCESS_DOC_PATH_FRAGMENTS = [
     "spec/",
     "plans/",
     "handbook",
     "session-numbers",
-    "subagent",
+    "sub" + "agent",
     "session-prompt",
-    ".superpowers",
+    "." + "super" + "powers",
 ]
 
 # Basename (filename without extension) checks catch process docs dropped at
@@ -150,7 +134,7 @@ PROCESS_DOC_BASENAME_EXACT = {"spec", "plan", "prompt"}
 PROCESS_DOC_BASENAME_CONTAINS = [
     "handbook",
     "session-numbers",
-    "subagent",
+    "sub" + "agent",
     "session-prompt",
     "prompt-history",
 ]
