@@ -220,6 +220,7 @@ export function footerHtml(): string {
   <footer class="site-footer">
     <div class="wrap site-footer__inner">
       <span class="site-footer__mark">Carmine</span>
+      <a href="https://github.com/safdar-hussain1" rel="author">Built by Safdar Hussain</a>
       <span>MIT licensed</span>
       <a href="${REPO_URL}" rel="noopener">Source on GitHub</a>
       <a href="./DESIGN_CARD.md">Design card</a>

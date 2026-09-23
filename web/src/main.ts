@@ -355,6 +355,8 @@ registerCheck("timing", async () => {
 });
 
 function bootstrap(): void {
+  console.info("Carmine — built by Safdar Hussain · https://github.com/safdar-hussain1/carmine");
+
   const app = document.querySelector<HTMLDivElement>("#app");
   if (app) {
     mountApp(app);
