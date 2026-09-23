@@ -32,7 +32,7 @@ lip lightness a capped fraction toward the target, which mechanically scales
 down high-frequency L variance by roughly that fraction. That metric is a
 diagnostic, not a ranking, and the number is published as measured.
 
-**Pinned by.** `tests/test_metrics.py::TestBenchmarkReport` —
+**Pinned by.** `tests/test_metrics.py::TestBenchmarkJsonSchema` —
 `test_lip_luminance_shift_ordering_matches_measured_reality` and
 `test_lip_detail_retention_ordering_matches_measured_reality` re-derive the
 published orderings from the committed JSON;
@@ -152,7 +152,7 @@ detection rather than a synthetic exact position, so the absolute deviations
 are mildly optimistic; the raw-vs-filtered comparison is unaffected, since
 every stream shares that anchor.
 
-**Pinned by.** `tests/test_metrics.py::TestBenchmarkReport::test_stability_section_schema`,
+**Pinned by.** `tests/test_metrics.py::TestBenchmarkJsonSchema::test_stability_section_schema`,
 which asserts the sweep is complete, that a null selection may not claim to
 have met the bar, and — explicitly — that the shipped defaults measured worse
 than raw, so making that inconvenient fact disappear takes a deliberate edit
