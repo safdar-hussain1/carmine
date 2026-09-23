@@ -391,9 +391,11 @@ What they pin, beyond the usual:
 
 - **Cross-surface parity.** `tests/test_parity_report.py` validates the
   committed `browser_metrics.json` against the same ΔE gates the browser
-  enforces, and never skips — a stale number cannot survive a change to the
-  code that produced it. `web/src/gen/test_vectors.json` holds Python-produced
-  vectors that the TypeScript engine is checked against unit by unit.
+  enforces, and never skips — a committed number outside the gates cannot
+  pass. It does not re-measure anything; that takes a browser
+  (`verify_site.py --with-parity`). `web/src/gen/test_vectors.json` holds
+  Python-produced vectors that the TypeScript engine is checked against unit by
+  unit.
 - **Constants cannot drift.** `tests/test_constants_sync.py` regenerates
   `web/src/gen/constants.json` from the Python source and diffs it byte for
   byte, so a feather radius changed on one side and not the other is a red
