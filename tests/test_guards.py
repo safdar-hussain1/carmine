@@ -2,7 +2,7 @@
 
 These tests protect repository hygiene invariants: private/dataset paths stay
 git-ignored, no leaked local file paths, no process/planning documents get
-tracked, and no references to AI tooling end up in tracked text files.
+tracked, and none of the banned words below end up in tracked text files.
 
 Banned strings are assembled from concatenated fragments so this file never
 contains a literal match of what it is guarding against.
@@ -113,8 +113,8 @@ def test_no_absolute_user_paths():
     assert not violations, f"absolute user paths found in tracked files: {violations}"
 
 
-# Assembled from fragments where the literal would itself be a trace of the
-# private tooling this guard keeps out.
+# Fragments, like the banned words above, where the literal would itself be
+# something this guard exists to keep out.
 PROCESS_DOC_PATH_FRAGMENTS = [
     "spec/",
     "plans/",

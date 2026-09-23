@@ -353,7 +353,7 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         id="banned-words-guard",
-        claim="No tracked file mentions the tooling this project's write-up frames as invisible",
+        claim="No tracked file contains a word the repository guard bans",
         apply=_mutate_banned_word,
         killers=[
             Killer("pytest", "tests/test_guards.py::test_no_banned_words_in_tracked_files", "banned-words guard"),

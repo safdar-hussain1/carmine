@@ -437,7 +437,7 @@ python scripts/mutation_battery.py
 | `opaque_fill` is measurably worse than the real engine | `test_baselines.py::TestOpaqueFill::test_erases_lip_texture` |
 | containment ignores a feathered mask's soft tail | `test_metrics.py::TestPigmentOnTarget::test_feathered_tail_below_threshold_does_not_count_as_inside` |
 | `data/` stays git-ignored | `test_guards.py::test_private_paths_are_ignored` |
-| no tracked file mentions the tooling | `test_guards.py::test_no_banned_words_in_tracked_files` |
+| no tracked file contains a banned word | `test_guards.py::test_no_banned_words_in_tracked_files` |
 | published CPU ΔE is inside the browser's own gate | `test_parity_report.py::test_cpu_parity_is_within_the_published_thresholds` |
 | committed benchmark numbers stay internally consistent | `test_metrics.py::TestBenchmarkJsonSchema::test_photo_section_schema` |
 
