@@ -421,16 +421,16 @@ show([REFERENCE, PORTRAIT, blue_face], ["'reference'", "did nothing", "blue face
 #      all outscores a real (if crude) makeup application.
 assert min(scores.values()) > 0.97, scores
 assert scores["no makeup at all (the input)"] > scores["flat opaque fill"], scores
-print("\\nSSIM spread across all four candidates: "
-      f"{max(scores.values()) - min(scores.values()):.4f}")
+spread = close(max(scores.values()) - min(scores.values()), 0.0226, 0.0001)
+print(f"\\nSSIM spread across all four candidates: {spread:.4f}")
 '''
 )
 
 md(
     """
 Doing nothing scores 0.9995. A face painted bright blue scores 0.9773. The
-entire range between "perfect" and "catastrophic" is three parts in a
-thousand, and within it the metric prefers inaction to effort. Any threshold
+entire range between "perfect" and "catastrophic" is 0.0226 — about two
+parts in a hundred — and within it the metric prefers inaction to effort. Any threshold
 drawn on that axis would be arbitrary, and reference-SSIM was dropped as a
 scoring protocol.
 
