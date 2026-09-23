@@ -283,7 +283,9 @@ export function createMirror(options: MirrorOptions): Mirror {
     // Building them the reference way costs hundreds of milliseconds on a
     // face that fills the frame -- the feather radii scale with the face,
     // not with the frame -- which is the difference between a mirror and a
-    // slideshow. The still-photo path below keeps the exact construction.
+    // slideshow. Photos come through here too when WebGL2 is available; only
+    // the CPU fallback for browsers without it (renderPhotoCpu) keeps the
+    // exact construction.
     const masks = masksFor(landmarks, width, height, look, "live");
 
     let gloss = {};

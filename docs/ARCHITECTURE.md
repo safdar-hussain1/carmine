@@ -144,11 +144,11 @@ and the difference between them is explicit at every call site via a
 | --- | --- | --- |
 | processing long side | 720 px | 360 px (quarter the pixels) |
 | feather | true Gaussian | box approximation |
-| skin smoothing | yes (bilateral) | not in this path |
+| skin smoothing | not in the browser (Python engine only) | not in the browser (Python engine only) |
 | matte finish blur | Gaussian of L | frame mip level at a matching radius |
 | gloss percentiles | measured after the tint | measured on the incoming frame |
 | measured cost (M1 Pro) | 357.6 ms/frame | 7.3 ms/frame |
-| used by | still renders, parity checks | the live camera loop |
+| used by | the parity and selftest checks, and still photos in a browser without WebGL2 | the live camera loop, and still photos whenever WebGL2 is available |
 
 Every one of those live-path departures is an approximation that trades a
 documented amount of fidelity for about a 49× reduction in mask cost, and none

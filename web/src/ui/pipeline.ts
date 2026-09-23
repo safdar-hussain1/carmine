@@ -129,8 +129,9 @@ export function computeGloss(pixels: Float32Array, masks: MaskSet, look: LookCon
  * Builds the masks a look needs from a detected face.
  *
  * @param quality `exact` (default) is the reference construction, and what
- *   every still render and every parity measurement uses. The live camera
- *   loop passes `live`; see `masks.ts` for what that trades away.
+ *   every parity measurement, the selftest and the no-WebGL2 photo fallback
+ *   use. The mirror passes `live` -- for the camera and for photos alike
+ *   whenever WebGL2 is available; see `masks.ts` for what that trades away.
  */
 export function masksFor(
   landmarks: ArrayLike<number>,
