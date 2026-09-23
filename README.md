@@ -149,10 +149,11 @@ two-pixel eyeliner stroke, where a one-pixel rasterisation disagreement has
 nothing to hide behind.
 
 Row two is the honest one: let each side run its own landmark detector and the
-worst mean rises to 2.717. Nothing about the rendering changed — that gap is
-the two detector builds placing the same face a fraction of a pixel apart, and
-it is roughly seven times larger than the entire rendering disagreement. The
-pigment maths is not the risk on this pipeline. The landmarker is.
+worst mean rises from 0.747 to 2.717 and the worst p99 from 2.763 to 18.454 —
+3.6 and 6.7 times the rendering disagreement. Nothing about the rendering
+changed: that gap is the two detector builds placing the same face a fraction
+of a pixel apart. The pigment maths is not the risk on this pipeline. The
+landmarker is.
 
 ### Timing: what a live frame costs
 

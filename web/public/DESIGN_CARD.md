@@ -83,9 +83,9 @@ headless Chrome, renders the committed reference frames in the browser, and
 compares against the Python engine's own renders in CIELAB ΔE.
 
 **Caveat.** Both tables belong together. The rendering disagreement is the
-first row; the second row is roughly seven times larger and almost none of it
-is rendering — it is the two landmarker builds placing the same face a
-fraction of a pixel apart. The worst single pixel in row one, 11.434, is 23
+first row; the second is 3.6 times larger at the mean and 6.7 times at p99, and
+almost none of that is rendering — it is the two landmarker builds placing the
+same face a fraction of a pixel apart. The worst single pixel in row one, 11.434, is 23
 pixels out of 388,800, all on the boundary of the two-pixel eyeliner stroke.
 The GPU shader path is measured and published too, but is **not** gated: it
 takes documented approximations the CPU reference does not, and headless

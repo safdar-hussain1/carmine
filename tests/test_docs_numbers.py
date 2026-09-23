@@ -133,3 +133,25 @@ def test_live_path_total_ms_and_fps():
     assert fps in readme
     assert total_ms in design_card
     assert fps in design_card
+
+
+def test_landmarker_gap_is_quoted_as_the_measured_multiples():
+    """The end-to-end row is described as a multiple of the rendering row.
+
+    Worst end-to-end over worst fixed-landmark, for the mean and for p99. The
+    phrases are matched whole (whitespace-normalised) so a stray "3.6"
+    elsewhere in the prose cannot satisfy them.
+    """
+    parity = _load(BROWSER_METRICS)["parity"]
+
+    def worst(key: str, field: str) -> float:
+        return max(case[field] for case in parity[key])
+
+    mean_ratio = f"{worst('endToEnd', 'meanDeltaE') / worst('cpu', 'meanDeltaE'):.1f}"
+    p99_ratio = f"{worst('endToEnd', 'p99DeltaE') / worst('cpu', 'p99DeltaE'):.1f}"
+    assert (mean_ratio, p99_ratio) == ("3.6", "6.7")
+
+    readme = " ".join(_read(README).split())
+    design_card = " ".join(_read(DESIGN_CARD).split())
+    assert f"{mean_ratio} and {p99_ratio} times the rendering disagreement" in readme
+    assert f"{mean_ratio} times larger at the mean and {p99_ratio} times at p99" in design_card

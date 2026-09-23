@@ -718,6 +718,8 @@ close(cpu["max"], 11.434, 0.001)
 close(e2e["mean"], 2.717, 0.001)
 close(e2e["p99"], 18.454, 0.001)
 close(e2e["max"], 30.135, 0.001)
+close(e2e["mean"] / cpu["mean"], 3.6, 0.05)
+close(e2e["p99"] / cpu["p99"], 6.7, 0.05)
 assert cpu["outside"] == e2e["outside"] == 0
 assert len(parity["cpu"]) == len(parity["endToEnd"]) == 9
 '''
@@ -737,9 +739,9 @@ one-pixel rasterisation disagreement nothing to hide behind.
 
 **Row two is the honest one.** Let each side run its own landmark detector —
 Python's MediaPipe build against the browser's wasm build — and the worst
-mean rises to 2.717, p99 to 18.454. Nothing about the rendering changed. The
-gap is the two detectors placing the same face a fraction of a pixel apart,
-and it is roughly seven times larger than the entire rendering disagreement.
+mean rises to 2.717, p99 to 18.454: 3.6 and 6.7 times the rendering
+disagreement. Nothing about the rendering changed. The gap is the two
+detectors placing the same face a fraction of a pixel apart.
 
 That is the useful finding, and it points at where effort belongs: the
 pigment maths is not the risk on this pipeline. The landmarker is.
