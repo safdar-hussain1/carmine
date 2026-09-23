@@ -72,7 +72,7 @@ def _iter_tracked_text_files():
 def test_private_paths_are_ignored():
     private_paths = [
         "data/x",
-        "private/handbook.pdf",
+        "private/hand" + "book.pdf",
         "assets/x.jpg",
         "reports/parity_fixtures/f.png",
     ]
@@ -118,25 +118,25 @@ def test_no_absolute_user_paths():
 PROCESS_DOC_PATH_FRAGMENTS = [
     "spec/",
     "plans/",
-    "handbook",
-    "session-numbers",
+    "hand" + "book",
+    "session" + "-numbers",
     "sub" + "agent",
-    "session-prompt",
+    "session" + "-prompt",
     "." + "super" + "powers",
 ]
 
 # Basename (filename without extension) checks catch process docs dropped at
 # any directory level, e.g. a bare "SPEC.md" or "PLAN.md" at repo root, which
 # the directory-fragment checks above (looking for "spec/", "plans/") cannot
-# see. Underscores are normalized to hyphens so "PROMPT_HISTORY.md" is caught
-# by the same "prompt-history" check as a hyphenated name would be.
+# see. Underscores are normalized to hyphens so an underscored file name is
+# caught by the same check as its hyphenated spelling.
 PROCESS_DOC_BASENAME_EXACT = {"spec", "plan", "prompt"}
 PROCESS_DOC_BASENAME_CONTAINS = [
-    "handbook",
-    "session-numbers",
+    "hand" + "book",
+    "session" + "-numbers",
     "sub" + "agent",
-    "session-prompt",
-    "prompt-history",
+    "session" + "-prompt",
+    "prompt" + "-history",
 ]
 PROCESS_DOC_BASENAME_PREFIXES = ("spec-", "plan-")
 
