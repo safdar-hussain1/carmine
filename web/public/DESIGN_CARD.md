@@ -6,8 +6,9 @@ true.
 
 Sources, both committed and machine-readable: `reports/benchmark.json` (photo
 quality, video stability) and `reports/browser_metrics.json` (cross-surface
-parity, per-stage timing). No figure below appears anywhere in this project
-that is not in one of those two files.
+parity, per-stage timing). Every measured figure below is in one of those two
+files or computed from them, except one pixel count from a diagnostic run,
+which says so.
 
 ---
 
@@ -85,8 +86,9 @@ compares against the Python engine's own renders in CIELAB ΔE.
 **Caveat.** Both tables belong together. The rendering disagreement is the
 first row; the second is 3.6 times larger at the mean and 6.7 times at p99, and
 almost none of that is rendering — it is the two landmarker builds placing the
-same face a fraction of a pixel apart. The worst single pixel in row one, 11.434, is 23
-pixels out of 388,800, all on the boundary of the two-pixel eyeliner stroke.
+same face a fraction of a pixel apart. The worst single pixel in row one,
+11.434, belongs to a group a diagnostic run counted at 23 pixels out of 388,800
+above ΔE 6, all on the boundary of the two-pixel eyeliner stroke.
 The GPU shader path is measured and published too, but is **not** gated: it
 takes documented approximations the CPU reference does not, and headless
 verification runs on a software rasteriser, which is not the hardware anyone

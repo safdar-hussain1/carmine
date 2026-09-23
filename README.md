@@ -66,10 +66,11 @@ executed with outputs.
 
 ## Measured
 
-Every number below is read from a committed machine-readable source:
-[`reports/benchmark.json`](reports/benchmark.json) and
-[`reports/browser_metrics.json`](reports/browser_metrics.json). Nothing is
-quoted that those files do not contain.
+Every measured number below comes from a committed machine-readable source,
+[`reports/benchmark.json`](reports/benchmark.json) or
+[`reports/browser_metrics.json`](reports/browser_metrics.json), or is computed
+from one. The single exception, a pixel count from the run that diagnosed the
+worst parity pixel, says so where it appears.
 
 ### Photo quality vs four standard failure modes
 
@@ -152,9 +153,9 @@ Gates the in-browser selftest enforces: mean < 2.0, p99 < 5.0, max < 12.0, outsi
 Row one is the rendering claim: given identical landmarks the two engines
 agree below the threshold of a just-noticeable colour difference, and not one
 pixel moves outside the region either engine painted. The worst single pixel,
-11.434, is understood — 23 pixels in 388,800, all on the boundary of the
-two-pixel eyeliner stroke, where a one-pixel rasterisation disagreement has
-nothing to hide behind.
+11.434, is understood: the diagnostic run behind it found 23 pixels in 388,800
+above ΔE 6, all on the boundary of the two-pixel eyeliner stroke, where a
+one-pixel rasterisation disagreement has nothing to hide behind.
 
 Row two is the honest one: let each side run its own landmark detector and the
 worst mean rises from 0.747 to 2.717 and the worst p99 from 2.763 to 18.454 —
