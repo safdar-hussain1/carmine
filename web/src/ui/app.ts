@@ -11,7 +11,7 @@ import { createMirror } from "./mirror";
 import { createRail } from "./rail";
 import { createShadeCard } from "./shadeCard";
 import { measuredSectionHtml } from "./measured";
-import { footerHtml, headerHtml, heroHeadHtml, howItWorksHtml, privacyHtml } from "./sections";
+import { footerHtml, howItWorksHtml, privacyHtml, shellHtml } from "./sections";
 import { initTheme } from "./theme";
 
 /** The look the page opens on. Everyday is the one that reads as makeup
@@ -27,21 +27,15 @@ export function mountApp(root: HTMLElement): void {
   let look = startingLook();
 
   root.innerHTML = `
-    ${headerHtml()}
-    <main id="top">
-      <section class="hero" id="mirror">
-        <div class="wrap">
-          ${heroHeadHtml()}
-          <div class="mirror">
-            <div class="mirror__stage"></div>
-            <div class="mirror__rail"></div>
-          </div>
-        </div>
-      </section>
-      ${howItWorksHtml()}
+    ${shellHtml(
+      `<div class="mirror">
+        <div class="mirror__stage"></div>
+        <div class="mirror__rail"></div>
+      </div>`,
+      `${howItWorksHtml()}
       ${measuredSectionHtml()}
-      ${privacyHtml()}
-    </main>
+      ${privacyHtml()}`,
+    )}
     ${footerHtml()}
   `;
 

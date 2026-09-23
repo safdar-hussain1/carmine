@@ -141,6 +141,30 @@ export function heroHeadHtml(): string {
   </div>`;
 }
 
+/**
+ * The masthead and the hero, with anything the app mounts slotted in.
+ *
+ * Called with no arguments this is the part of the page that needs no
+ * script: `vite.config.ts` writes it into `index.html` at build time, so the
+ * served HTML already carries the page's only h1 heading for search engines
+ * and link previews. `mountApp` renders the same shell with the mirror and
+ * the sections in it, so the masthead and headline do not move when it
+ * takes over.
+ */
+export function shellHtml(mirror = "", sections = ""): string {
+  return `
+  ${headerHtml()}
+  <main id="top">
+    <section class="hero" id="mirror">
+      <div class="wrap">
+        ${heroHeadHtml()}
+        ${mirror}
+      </div>
+    </section>
+    ${sections}
+  </main>`;
+}
+
 export function howItWorksHtml(): string {
   const steps = STEPS.map(
     (step, index) => `
