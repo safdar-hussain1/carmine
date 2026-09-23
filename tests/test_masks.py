@@ -81,9 +81,9 @@ class TestLipMask:
 # Eyeliner is a thin line rather than a filled region: its area is
 # length x thickness, and integer-rounded thickness at small feather
 # sigmas doesn't track the quadratic area scaling that filled polygons
-# and ellipses show. studio-v1 excluded it from the scaling check for
-# the same reason; the remaining masks are all filled/thick-stroke
-# regions and do scale quadratically.
+# and ellipses show, so it is left out of the scaling check. The
+# remaining masks are all filled/thick-stroke regions and do scale
+# quadratically.
 SCALING_MASK_FUNCS = [name for name in MASK_FUNCS if name != "eyeliner_mask"]
 
 

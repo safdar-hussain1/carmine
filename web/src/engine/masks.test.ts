@@ -6,9 +6,10 @@ import constants from "../gen/constants.json";
 /**
  * These are structural tests, not parity tests.
  *
- * Mask geometry is compared against the Python engine pixel-for-pixel in
- * Task 14, on real detected landmarks, with a tolerance that accounts for
- * the two rasterizers disagreeing at edges. What is worth pinning *here* is
+ * Mask geometry is compared against the Python engine pixel-for-pixel by
+ * the browser parity run (`scripts/verify_site.py --with-parity`), on real
+ * detected landmarks, with a tolerance that accounts for the two
+ * rasterizers disagreeing at edges. What is worth pinning *here* is
  * the set of properties that make each mask the right shape at all -- the
  * lip mask leaving an open mouth alone, the crease gradient actually
  * fading toward the brow, the eyeliner wing extending past the eye corner.
@@ -250,7 +251,7 @@ describe("eyeshadow mask", () => {
     // few pixels up rather than at the lash line itself; from there it
     // falls away monotonically, which is what "heaviest at the lashes,
     // lightest at the brow bone" looks like once feathered. The exact
-    // gradient values are pinned against Python by the Task 14 parity run.
+    // gradient values are pinned against Python by the browser parity run.
     const shadow = build(["eyeshadow"]).masks.eyeshadow!;
     const lashY = RIGHT_EYE.cy - RIGHT_EYE.ry;
     const profile = [2, 8, 14, 22, 30].map((d) => at(shadow, WIDTH, RIGHT_EYE.cx, lashY - d));

@@ -19,8 +19,8 @@ from mediapipe.tasks.python.core.base_options import BaseOptions
 
 from .regions import NUM_LANDMARKS
 
-# sha256 of the known-good face_landmarker.task, computed from the file
-# cached at ~/.cache/virtual_makeup/face_landmarker.task. The download URL
+# sha256 of the known-good face_landmarker.task -- the same file the browser
+# mirror bundles at web/public/models/face_landmarker.task. The download URL
 # below serves "latest", which can drift out from under this pin -- that
 # drift is exactly what the checksum check catches.
 _CHECKSUM = "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff"

@@ -10,8 +10,9 @@ impossible. Values that only exist as literals buried inside function
 bodies in `carmine/masks.py`, `carmine/pigment.py`, and `carmine/engine.py`
 are mirrored by hand below, each with a comment citing the source line;
 `tests/test_constants_sync.py` catches this script drifting from the
-committed JSON, and Task 12's parity tests catch the mirrored literals
-drifting from the Python source.
+committed JSON, and the TypeScript tests against Python-produced vectors
+(`web/src/gen/test_vectors.json`) plus the browser parity run catch the
+mirrored literals drifting from the Python source.
 
 Run as: PYTHONPATH=src python scripts/export_constants.py
 """

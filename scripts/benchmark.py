@@ -162,18 +162,15 @@ def _method_thunks(image: np.ndarray, landmarks: np.ndarray, look):
     is never inside a timed thunk -- every thunk here does only the paint
     work for its one method, nothing else's.
 
-    Per-method input semantics are faithful to the studio-v1 driver this was
-    ported from, adapted to this codebase's baseline signatures:
+    Per-method inputs, matched to each baseline's signature:
 
-    * `mismatched_indices` there detected real 68-point dlib landmarks and
-      applied 68-point region slices to them (correctly, since that IS the
-      68-point scheme). Here, `carmine.baselines.mismatched_indices` takes
-      the *478-point mesh* landmarks and misapplies the 68-point slices to
-      them directly -- the bug it reproduces (68-point index ranges run
-      against a 478-point array) is already baked into the function
-      signature, so no separate dlib detection is needed or meaningful for
-      this baseline; the mesh landmarks already detected for every other
-      method are passed straight through.
+    * `carmine.baselines.mismatched_indices` takes the *478-point mesh*
+      landmarks and misapplies 68-point region slices to them directly --
+      the bug it reproduces (68-point index ranges run against a 478-point
+      array) is baked into the function itself, so no separate 68-point
+      detector is needed or meaningful for this baseline; the mesh
+      landmarks already detected for every other method are passed
+      straight through.
     * `opaque_fill` and `channel_swap` take the correct mesh landmarks, same
       as the real engine. `channel_swap` internally calls `apply_look` and
       then does one extra color-space conversion, so its timing is expected
