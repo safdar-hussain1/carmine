@@ -1,0 +1,78 @@
+# The Python suite on two Python versions, and the browser mirror's unit tests
+# and production build, on every push and pull request to main.
+#
+# What this does not run, and why:
+# - The five parity-fixture tests in tests/test_parity_report.py render from
+#   the private portrait dataset (data/, git-ignored). A checkout has no
+#   dataset, so they skip with that reason; `pytest -rs` prints it. The
+#   committed parity numbers (reports/browser_metrics.json) are still checked
+#   by the tests beside them, which never skip.
+# - scripts/verify_site.py, the in-browser selftest, needs Chrome with WebGL2
+#   and is run locally before each publish.
+# - Nothing needs a camera: the browser tests use the bundled portrait.
+
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    env:
+      # The face model ships in the repository; use it rather than
+      # downloading it on every run.
+      CARMINE_MODEL: ${{ github.workspace }}/web/public/models/face_landmarker.task
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Run the suite
+        run: pytest -q -rs
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Unit tests
+        run: npx vitest run
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+      # docs/ is what GitHub Pages serves, and it is committed. If a fresh
+      # build changes it, the published site is out of date with the sources
+      # in this commit.
+      - name: The committed site matches its sources
+        run: git status --porcelain -- ../docs && test -z "$(git status --porcelain -- ../docs)"
