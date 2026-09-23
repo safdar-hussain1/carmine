@@ -7,8 +7,8 @@
 eyes, brows and cheeks in CIELAB, so the face keeps its own texture, highlights
 and shadow instead of flattening into a sticker of solid colour. The same
 algorithm ships twice: a Python engine and CLI for photos and video, and a live
-mirror that runs on your camera in the browser, checked against the Python
-renders on every build.
+mirror that runs on your camera in the browser, measured against the Python
+renders pixel by pixel.
 
 **[Try the live mirror →](https://safdar-hussain1.github.io/carmine/)**
 Your camera, in your browser. No upload, no account, and every file it needs
@@ -147,7 +147,7 @@ publishing only the first would be misleading.
 | same landmarks, both engines | 0.747 | 2.763 | 11.434 | 0 |
 | end-to-end, each its own landmarker | 2.717 | 18.454 | 30.135 | 0 |
 
-Gates enforced by the build: mean < 2.0, p99 < 5.0, max < 12.0, outside = 0.
+Gates the in-browser selftest enforces: mean < 2.0, p99 < 5.0, max < 12.0, outside = 0.
 
 Row one is the rendering claim: given identical landmarks the two engines
 agree below the threshold of a just-noticeable colour difference, and not one
@@ -196,10 +196,11 @@ carmine looks                # prints the four presets if the install worked
 ```
 
 Python 3.10 to 3.14: CI runs 3.12 and 3.13 on Linux, and a clean install on
-macOS passes the suite on all five. The engine needs the MediaPipe FaceLandmarker model (~3.8 MB,
-Apache-2.0). It ships in this repository, and `CARMINE_MODEL` points the engine
-at it. Without that variable the first run downloads the same file to
-`~/.cache/carmine/` and checks it against a pinned sha256.
+macOS passes the suite on all five. The engine needs the MediaPipe
+FaceLandmarker model (~3.8 MB, Apache-2.0). It ships in this repository, and
+`CARMINE_MODEL` points the engine at it. Without that variable the first run
+downloads the same file to `~/.cache/carmine/` and checks it against a pinned
+sha256.
 
 For the browser mirror you also need Node.js (CI uses 22): `cd web && npm ci`.
 
@@ -209,9 +210,10 @@ For the browser mirror you also need Node.js (CI uses 22): `cd web && npm ci`.
   — Python from the python.org macOS installer has no CA certificates until you
   run `Install Certificates.command` from its folder in Applications. Or skip
   the download: set `CARMINE_MODEL` as above.
-- `ModuleNotFoundError: No module named 'carmine'` right after
-  `pip install -e .` — some virtualenv setups do not pick up the editable
-  install. Put the source on the path for that shell instead:
+- `ModuleNotFoundError: No module named 'carmine'` although `pip install -e .`
+  succeeded — the editable install points at the folder it was made from, so
+  it breaks if the repository is moved or renamed, and some virtualenv setups
+  never pick it up. Put the source on the path for that shell instead:
   `export PYTHONPATH=src` from the repository root.
 
 ## Every command
@@ -222,7 +224,9 @@ own files; `web/public/demo/model.jpg` is a sample portrait to try.
 ```bash
 # --- the CLI (also runs as `python -m carmine ...`) -----------------------------
 carmine looks                                    # the presets: bare, everyday, glass, velvet
-carmine looks --json                             # the same as Look JSON, the format --look-json reads
+carmine looks --json                             # every preset as Look JSON, keyed by name
+carmine looks --json | python -c "import json, sys; json.dump(json.load(sys.stdin)['velvet'], sys.stdout)" > look.json
+#   one entry on its own is a --look-json file; edit colours and intensities there
 
 carmine apply IN.jpg OUT.jpg --preset velvet     # --preset bare | everyday | glass | velvet
 carmine apply IN.jpg OUT.jpg --look-json look.json
@@ -275,8 +279,9 @@ python scripts/make_og_image.py                  # web/public/og-image.png, the 
 ```
 
 `verify_site.py` also takes `--timeout SECONDS` (default 120; 900 for
-`--with-parity` and `--timing-only`) and `--expect-checks N` (default 9; `0` turns the count check
-off). `make_og_image.py` takes `--theme light|dark` and `--out PATH`.
+`--with-parity` and `--timing-only`) and `--expect-checks N` (default 9; `0`
+turns the count check off). `build_notebook.py` takes `--kernel NAME` (default
+`python3`); `make_og_image.py` takes `--theme light|dark` and `--out PATH`.
 
 **Why the built site needs a server.** `docs/index.html` loads its script as an
 ES module and its stylesheet with `crossorigin`, and fetches the face model and
@@ -290,16 +295,17 @@ committed, and some tests read that output:
 
 | command | what changes |
 | --- | --- |
-| `scripts/benchmark.py` | `reports/benchmark.json`: every `ms_per_image` moves with machine load |
-| `scripts/stability_bench.py` | `reports/benchmark.json`: `video_ms_per_frame` moves |
-| `scripts/verify_site.py --with-parity` | `reports/browser_metrics.json`: the SwiftShader timing block moves; pass `--metrics-out` elsewhere to keep the committed file |
+| `scripts/benchmark.py` | `reports/benchmark.json`: every `ms_per_image` moves with machine load. The quality figures were measured with OpenCV 4.13, which reproduces them exactly; a fresh install gets OpenCV 4.14, which moves some baseline cells in the third decimal (Carmine's own row holds at the published precision) |
+| `scripts/stability_bench.py` | `reports/benchmark.json`: only `video_ms_per_frame` moves |
+| `scripts/verify_site.py --with-parity` | `reports/browser_metrics.json`: the SwiftShader timing, and the end-to-end row by a few thousandths (a run today gives a worst mean of 2.715 against the committed 2.717), which `tests/test_docs_numbers.py` pins, so `pytest` goes red. Pass `--metrics-out` elsewhere to keep the committed file |
 | `scripts/verify_site.py --timing-only` | `reports/browser_metrics.json`: the published 26.6 ms, which `tests/test_docs_numbers.py` pins, so `pytest` goes red |
-| `scripts/build_notebook.py` without `--execute` | the notebook, written back without any outputs |
+| `scripts/make_figures.py` | its three figures: the same pictures, but each PNG records the local matplotlib version, and two come out a pixel or two wider |
+| `scripts/build_notebook.py` | without `--execute`, the notebook written back with no outputs; with it, new timestamps and log lines |
 | `scripts/make_og_image.py` | `web/public/og-image.png`, a fresh screenshot every run |
 
 `git checkout -- <path>` puts any of them back. Everything else in the list
-reproduces the committed bytes; the tests check that for the two generated
-JSON files.
+reproduces the committed bytes: the two generated JSON files (the tests check
+those), the mask preview, the demo portrait and the built site.
 
 ## The mirror
 
