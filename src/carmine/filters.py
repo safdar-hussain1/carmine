@@ -3,9 +3,11 @@
 Raw per-frame landmark detections jitter even when the face is still --
 small pixel-level noise in the detector's output. A naive low-pass filter
 either lags behind fast motion or leaves the jitter mostly intact; the
-One-Euro filter (Casiez, Pavia & Roussel, 2012) adapts its cutoff frequency
-to the signal's own speed, so it damps jitter hard when the landmarks are
-nearly still and relaxes to follow quick motion without much lag.
+One-Euro filter (Casiez, Roussel & Vogel, "1€ Filter: A Simple Speed-based
+Low-pass Filter for Noisy Input in Interactive Systems", CHI 2012) adapts its
+cutoff frequency to the signal's own speed, so it damps jitter hard when the
+landmarks are nearly still and relaxes to follow quick motion without much
+lag.
 """
 
 from __future__ import annotations

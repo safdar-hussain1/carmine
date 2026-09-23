@@ -4,7 +4,9 @@
  *
  * Raw per-frame landmarks jitter even on a perfectly still face. A fixed
  * low-pass either lags visibly during head motion or leaves that jitter
- * mostly intact; the One-Euro filter (Casiez, Pavia & Roussel, 2012) raises
+ * mostly intact; the One-Euro filter (Casiez, Roussel & Vogel, "1€ Filter:
+ * A Simple Speed-based Low-pass Filter for Noisy Input in Interactive
+ * Systems", CHI 2012) raises
  * its own cutoff frequency in proportion to the signal's speed, so it damps
  * hard when the face is still and gets out of the way when it moves.
  *
