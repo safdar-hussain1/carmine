@@ -173,7 +173,7 @@ export const PRODUCTS: ProductMeta[] = [
   {
     name: "highlighter",
     label: "Glow",
-    blurb: "Cheekbone, nose bridge and brow bone, lifted at the highlights.",
+    blurb: "Cheekbones and the bridge of the nose, lifted at the highlights.",
     shades: HIGHLIGHTER,
     defaultIntensity: 0.5,
   },
