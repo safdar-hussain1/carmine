@@ -9,8 +9,9 @@
  * reading and never like copy.
  *
  * No font files are downloaded. Every face is a system stack and every asset
- * is served from this origin, because the privacy claim on the page ("the
- * page makes no network requests") has to survive a look at the network tab.
+ * is served from this origin, because the privacy claim on the page (every
+ * request goes to this site, and none at all once the mirror is running) has
+ * to survive a look at the network tab.
  *
  * Colour is anchored on carmine itself -- #960018, the pigment the project
  * is named for -- against warm neutrals. Carmine is used only where it means

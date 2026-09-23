@@ -4,8 +4,8 @@
  *
  * The diagrams are inline SVG rather than images for three reasons: they
  * inherit the theme through `currentColor`, they stay sharp at any size, and
- * an image file would be a network request on a page whose whole claim is
- * that it makes none.
+ * an image file would be one more network request on a page that promises
+ * to make as few as it can, all of them to its own site.
  */
 
 import { ICONS } from "./icons";
@@ -201,8 +201,9 @@ export function privacyHtml(): string {
         <h2>Every frame stays on this device.</h2>
         <p class="lede">
           That is a claim about network traffic, so here is how to check it rather than take it on
-          trust: after this page has loaded, it makes no requests at all &mdash; not for the model,
-          not for fonts, not for analytics, and certainly not for your camera frames.
+          trust: every request this page makes goes to this site, and once the mirror has loaded its
+          face model it makes none at all &mdash; no fonts, no analytics, and never your camera
+          frames.
         </p>
       </div>
       <div class="privacy">
@@ -219,19 +220,21 @@ export function privacyHtml(): string {
           <h3>How to verify it</h3>
           <ol>
             <li>Open your browser's developer tools and switch to the Network panel.</li>
-            <li>Reload this page and let it finish loading.</li>
-            <li>Open the mirror, change shades, capture a photo.</li>
-            <li>The request list stops growing the moment loading finishes.</li>
+            <li>Reload this page and open the mirror. The face model and the wasm runtime that
+              runs it load now, from this site.</li>
+            <li>Change shades, drag the before/after split, capture a photo.</li>
+            <li>Nothing more is requested: the list stops growing once the model has loaded.</li>
           </ol>
-          <p>Or the blunter version: switch your network off and use the page anyway.</p>
+          <p>Or the blunter version: once the mirror is running, switch your network off and keep
+            using it.</p>
         </article>
         <article class="privacy__card">
           <h3>What is bundled</h3>
           <p>
             The face landmark model and the wasm runtime that executes it are served from this
-            origin instead of a CDN, which is what makes the zero-request claim possible. Type is
-            set in system fonts for the same reason &mdash; a web font would be a request to
-            somebody else's server on every visit.
+            origin instead of a CDN, and only fetched when you first open the mirror or a photo.
+            That is what keeps every request on this site. Type is set in system fonts for the same
+            reason &mdash; a web font would be a request to somebody else's server on every visit.
           </p>
         </article>
       </div>

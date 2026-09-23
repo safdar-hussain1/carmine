@@ -114,7 +114,7 @@ export function createMirror(options: MirrorOptions): Mirror {
   const panelClaim = el(
     "p",
     "stage__claim",
-    "Every frame stays on this device. Nothing is uploaded &mdash; once the page has loaded it makes no network requests at all.",
+    "Every frame stays on this device. Nothing is uploaded &mdash; the face model runs in this tab, fetched from this site the first time you open the mirror.",
   );
   const panelActions = el("div", "stage__actions");
   const openBtn = button("btn btn--primary", "Open the mirror", ICONS.camera);

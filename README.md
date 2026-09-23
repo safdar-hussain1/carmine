@@ -5,8 +5,8 @@ eyes, brows and cheeks in CIELAB, so the face keeps its own texture, highlights
 and shadow instead of flattening into a sticker of solid colour.
 
 **[Try the live mirror →](https://safdar-hussain1.github.io/carmine/)**
-Your camera, in your browser. No upload, no account, no network request after
-the page loads.
+Your camera, in your browser. No upload, no account, and every file it needs
+comes from the page's own site.
 
 ![Four preset looks applied to a portrait](reports/figures/presets_demo.png)
 
@@ -256,11 +256,13 @@ on a phone would cost more than every colour operation combined.
 
 **Privacy is a claim about network traffic, so it is checkable.** The landmark
 model and the wasm runtime are served from the same origin instead of a CDN,
-type is set in system fonts, and there are no analytics: after the page
-finishes loading it makes **zero** requests. Open the Network panel, reload,
-use the mirror, watch the list stop growing — or just turn the network off and
-keep using it. Captures save through your own browser's download; nothing is
-written anywhere else.
+type is set in system fonts, and there are no analytics: every request the page
+makes goes to its own site, and once the mirror has loaded its model (the first
+time you open it) it makes **no** further requests. Open the Network panel,
+reload, open the mirror, then change shades and capture: the list stops
+growing. Or turn the network off once the mirror is running and keep using it.
+Captures save through your own browser's download; nothing is written anywhere
+else.
 
 The built site carries its own acceptance test. Load it with `?selftest=1` and
 the tab title reports the result — `SELFTEST PASS n=9 skipped=2` on the

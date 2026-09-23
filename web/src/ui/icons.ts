@@ -1,8 +1,8 @@
 /**
  * Inline SVG icons, drawn on a 24-unit grid with `currentColor` strokes so
  * they inherit the theme. Small enough to keep here rather than ship an
- * icon font: a font file would be a second network request, and the page
- * makes none.
+ * icon font: a font file would be one more network request, and the page
+ * keeps those to its own few files.
  */
 
 const stroke = 'fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"';
