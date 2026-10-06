@@ -1,5 +1,11 @@
 /**
- * The mirror: camera in, look on your face, one frame at a time.
+ * The mirror: a face, the look on it, and a handle to compare.
+ *
+ * It shows one of three sources in an arch-shaped stage -- the sample
+ * portrait, the camera, or a photo of your own. Stills are analysed once
+ * (see scene.ts) and redrawn on demand, which is cheap enough to blend from
+ * one look to the next frame by frame. The camera runs the whole pipeline
+ * on every frame.
  *
  * Per live frame the work is detect -> (optionally) smooth -> build masks ->
  * one WebGL2 draw. The frame never leaves the page: it goes from the video
@@ -12,12 +18,18 @@
  * per display refresh: on a 30fps camera and a 120Hz screen, rAF would run
  * the whole detect-and-mask pipeline four times over the same picture.
  * `rAF` is the fallback.
+ *
+ * The first time the sample is ready, the mirror plays the pipeline back in
+ * slow motion -- the landmark points, then the masks, then the colour -- so
+ * the opening seconds explain what the engine does instead of only showing
+ * the result. Anyone who asks for reduced motion gets the result directly.
  */
 
-import { startCamera, stopCamera, loadPhoto } from "../lib/camera";
+import { loadPhoto, startCamera, stopCamera } from "../lib/camera";
 import { createRenderer, type Renderer } from "../engine/renderer";
 import { OneEuroFilter } from "../engine/oneEuro";
-import type { LookConfig } from "../engine/look";
+import { hexToRgb } from "../engine/color";
+import { PRODUCT_ORDER, type LookConfig } from "../engine/look";
 import { PROC_MAX_SIDE_LIVE, type MaskSet } from "../engine/masks";
 import {
   applyLookCpu,
@@ -30,10 +42,21 @@ import {
   toImageData,
   toProcessingCanvas,
 } from "./pipeline";
+import { analyzePhoto, glossFor, type PhotoScene } from "./scene";
+import { boxToContentX, contentToBox, coverFit, focusOn, type CoverFit } from "./geometry";
+import { easeInOut, mixLook, withoutMakeup } from "./tween";
+import { FACTS } from "./facts";
 import { ICONS } from "./icons";
 
 /** Long side the drawing buffer is capped at, matching the camera request. */
 const MAX_OUTPUT_SIDE = 1280;
+
+/** How long a change of look or shade takes to blend in. Long enough to see
+ * the colour turn, short enough that the mirror never feels behind you. */
+const BLEND_MS = 420;
+
+/** The opening reveal, phase by phase. */
+const REVEAL_MS = { dots: 950, masks: 750, tint: 1250, wipe: 700 };
 
 const EMPTY_MASKS: MaskSet = {
   quality: "exact",
@@ -44,16 +67,33 @@ const EMPTY_MASKS: MaskSet = {
   masks: {},
 };
 
-type Mode = "idle" | "live" | "photo" | "denied" | "unsupported";
+export type Source = "sample" | "camera" | "photo";
+
+type Tone = "busy" | "ready" | "live" | "warn";
 
 export interface Mirror {
   element: HTMLElement;
-  /** Push a new look; live picks it up next frame, photo re-renders now. */
-  setLook(look: LookConfig): void;
+  /** Put a look on the face; `animate` blends to it instead of cutting. */
+  setLook(look: LookConfig, animate: boolean): void;
+  /** Load the face model and run the sample portrait. */
+  start(): void;
+  useCamera(): void;
+  choosePhoto(): void;
 }
 
 interface MirrorOptions {
-  getLook: () => LookConfig;
+  look: LookConfig;
+  /** Start on the sample as soon as the page is up, without a click. */
+  autostart: boolean;
+  /** Called once, when the sample has been analysed. */
+  onSampleReady(scene: PhotoScene): void;
+  onSourceChange(source: Source): void;
+}
+
+interface NoticeAction {
+  label: string;
+  run: () => void;
+  primary?: boolean;
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -78,101 +118,135 @@ function button(className: string, label: string, icon?: string): HTMLButtonElem
   return node;
 }
 
-export function createMirror(options: MirrorOptions): Mirror {
-  // One block: the picture, its controls and the card naming what is on the
-  // face. They travel together, because on a wide screen the block is what
-  // sticks while the product rail beside it scrolls.
-  const root = el("div", "mirror-block");
+function copyLook(look: LookConfig): LookConfig {
+  return mixLook(look, look, 1);
+}
 
+function prefersReducedMotion(): boolean {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+}
+
+export function createMirror(options: MirrorOptions): Mirror {
+  // ---- markup ------------------------------------------------------------
+
+  const root = el("div", "mirror");
+  const stageFrame = el("div", "stage-frame");
   const stage = el("div", "stage");
-  stage.dataset.mode = "idle";
-  stage.dataset.wipe = "off";
+  stage.dataset.source = "sample";
+  stage.dataset.phase = "idle";
+  stage.dataset.drawn = "false";
+  stage.dataset.compare = "off";
+  stage.setAttribute("role", "group");
+  stage.setAttribute("aria-label", "Makeup mirror");
+
+  // The sample is on screen from the first paint; the engine's own render
+  // replaces it only once there is something to show.
+  const poster = el("img", "stage__poster");
+  poster.src = SAMPLE_PORTRAIT_URL;
+  poster.alt = "The sample portrait the demo runs on";
+  poster.width = 1600;
+  poster.height = 1067;
+  poster.decoding = "async";
 
   const video = el("video", "stage__video");
   video.playsInline = true;
   video.muted = true;
 
   const canvas = el("canvas", "stage__canvas");
+  const overlay = el("canvas", "stage__overlay");
+  overlay.setAttribute("aria-hidden", "true");
 
   const wipe = el("div", "wipe");
-  const wipeLine = el("div", "wipe__line");
-  const wipeGrip = el("div", "wipe__grip", ICONS.grip);
+  const wipeLine = el("span", "wipe__line");
+  const wipeGrip = el("span", "wipe__grip", ICONS.grip);
   const tagBefore = el("span", "wipe__tag wipe__tag--before", "Before");
   const tagAfter = el("span", "wipe__tag wipe__tag--after", "After");
-  wipe.append(tagBefore, tagAfter, wipeLine, wipeGrip);
+  wipe.append(wipeLine, tagBefore, tagAfter, wipeGrip);
 
-  const hud = el("div", "hud");
-  const hudDot = el("span", "hud__dot");
-  const hudText = el("span", "hud__text", "&mdash;");
-  hud.append(hudDot, hudText);
+  const status = el("p", "stage__status");
+  status.setAttribute("role", "status");
+  const statusDot = el("span", "stage__dot");
+  const statusText = el("span", "stage__status-text");
+  status.append(statusDot, statusText);
+  status.hidden = true;
 
-  const panel = el("div", "stage__panel");
-  // Not the wordmark again -- the masthead already carries "Carmine". This
-  // is the quieter glyph alone, so the stage reads as a compact's mirror
-  // rather than a second logo lockup.
-  const panelMark = el("div", "stage__mark", ICONS.lipmark);
-  const panelClaim = el(
-    "p",
-    "stage__claim",
-    "Every frame stays on this device. Nothing is uploaded &mdash; the face model runs in this tab, fetched from this site the first time you open the mirror.",
-  );
-  const panelActions = el("div", "stage__actions");
-  const openBtn = button("btn btn--primary", "Open the mirror", ICONS.camera);
-  const sampleBtn = button("btn btn--ghost", "Sample portrait", ICONS.sample);
-  const uploadBtn = button("btn btn--ghost", "Upload a photo", ICONS.photo);
-  panelActions.append(openBtn, sampleBtn, uploadBtn);
-  const panelNote = el("p", "stage__note", "Your camera is only asked for when you tap Open the mirror.");
-  panel.append(panelMark, panelClaim, panelActions, panelNote);
+  const notice = el("div", "stage__notice");
+  notice.setAttribute("role", "alert");
+  const noticeText = el("p", "stage__notice-text");
+  const noticeActions = el("div", "stage__notice-actions");
+  notice.append(noticeText, noticeActions);
+  notice.hidden = true;
 
-  const fileInput = el("input");
+  const startBtn = button("btn btn--primary stage__start", "Start the live demo", ICONS.play);
+  startBtn.hidden = true;
+
+  stage.append(poster, video, canvas, overlay, wipe, status, notice, startBtn);
+  stageFrame.append(stage);
+
+  const bar = el("div", "mirror__bar");
+  const backBtn = button("tool", "Back to the sample", ICONS.back);
+  const compareBtn = button("tool", "Compare", ICONS.compare);
+  compareBtn.setAttribute("aria-pressed", "false");
+  compareBtn.title = "Show the face before and after, side by side";
+  const steadyBtn = button("tool", "Steady", ICONS.steady);
+  steadyBtn.setAttribute("aria-pressed", "true");
+  steadyBtn.title = "Smooth the landmark points between camera frames";
+  const saveBtn = button("tool", "Save photo", ICONS.download);
+  saveBtn.title = "Download what the mirror shows as a PNG";
+  saveBtn.disabled = true;
+  bar.append(backBtn, compareBtn, steadyBtn, saveBtn);
+
+  const fileInput = el("input", "visually-hidden");
   fileInput.type = "file";
   fileInput.accept = "image/*";
-  fileInput.className = "visually-hidden";
+  fileInput.tabIndex = -1;
+  fileInput.setAttribute("aria-hidden", "true");
 
-  stage.append(video, canvas, wipe, hud, panel);
+  root.append(stageFrame, bar, fileInput);
 
-  const bar = el("div", "stage-bar");
-  const steadyBtn = button("btn", "Steady");
-  steadyBtn.setAttribute("aria-pressed", "true");
-  steadyBtn.title = "One-Euro smoothing on the landmark stream";
-  const wipeBtn = button("btn", "Before / after", ICONS.compare);
-  wipeBtn.setAttribute("aria-pressed", "false");
-  const spacer = el("div", "stage-bar__spacer");
-  const captureBtn = button("btn", "Capture PNG", ICONS.download);
-  const stopBtn = button("btn", "Stop camera", ICONS.stop);
-  bar.append(steadyBtn, wipeBtn, spacer, captureBtn, stopBtn);
+  // ---- state -------------------------------------------------------------
 
-  root.append(stage, bar, fileInput);
+  let source: Source = "sample";
+  let sampleScene: PhotoScene | null = null;
+  let photoScene: PhotoScene | null = null;
+  let booting: Promise<void> | null = null;
 
-  // ---- state ------------------------------------------------------------
-
-  let mode: Mode = "idle";
-  let look = options.getLook();
   let renderer: Renderer | null = null;
   let rendererTried = false;
+
+  /** What the controls say. */
+  let target = copyLook(options.look);
+  /** What is on the face this frame, which trails `target` while blending. */
+  let shown = copyLook(options.look);
+  let blend: { from: LookConfig; to: LookConfig; start: number; duration: number } | null = null;
+
+  let compare = false;
+  let splitPos = 0.5;
+  let focus = { fx: 0.5, fy: 0.5 };
+
   let filter = new OneEuroFilter();
   let steady = true;
-  let splitFraction: number | null = null;
-  let photoSource: CanvasImageSource | null = null;
-  let photoSize = { width: 0, height: 0 };
   let running = false;
   let loopHandle = 0;
+  /** Bumped whenever the live loop starts or stops. A frame callback from an
+   * older loop -- one still waiting on the model when the camera was closed
+   * and opened again -- sees a stale number and ends its chain. */
+  let loopId = 0;
+  /** The camera request in flight, so a second click joins it instead of
+   * opening a second stream nobody would ever stop. */
+  let cameraStart: Promise<void> | null = null;
+  /** Bumped when the reader moves on to another source, so a camera stream
+   * that is only granted afterwards is closed instead of shown. */
+  let cameraTicket = 0;
   let usingVideoFrames = false;
-  let pendingCapture = false;
   let fps = 0;
   let lastFrameTime = 0;
+  let lastStatusAt = 0;
+  let pendingCapture = false;
+  let drawHandle = 0;
+  let revealing = false;
+  let revealToken = 0;
   const procCanvas = document.createElement("canvas");
-
-  function setMode(next: Mode): void {
-    mode = next;
-    stage.dataset.mode = next;
-    const interactive = next === "live" || next === "photo";
-    captureBtn.disabled = !interactive;
-    wipeBtn.disabled = !interactive;
-    steadyBtn.disabled = next !== "live";
-    stopBtn.disabled = next !== "live";
-    stopBtn.hidden = next !== "live";
-  }
 
   function ensureRenderer(): Renderer | null {
     if (renderer || rendererTried) {
@@ -183,30 +257,76 @@ export function createMirror(options: MirrorOptions): Mirror {
     return renderer;
   }
 
-  /**
-   * Where the wipe handle sits along the *canvas*, as a fraction of its
-   * width. The handle is dragged in stage coordinates, and the canvas is
-   * drawn with `object-fit: cover`, so a canvas that is wider than the stage
-   * is cropped left and right -- without undoing that crop the seam would
-   * drift away from the handle the reader is holding.
-   */
-  function splitCanvasFraction(): number | null {
-    if (splitFraction === null) {
-      return null;
+  function currentScene(): PhotoScene | null {
+    if (source === "sample") {
+      return sampleScene;
     }
-    const rect = stage.getBoundingClientRect();
-    if (rect.width <= 0 || canvas.width <= 0 || canvas.height <= 0) {
-      return splitFraction;
-    }
-    const scale = Math.max(rect.width / canvas.width, rect.height / canvas.height);
-    const offsetX = (rect.width - canvas.width * scale) / 2;
-    return Math.min(Math.max((splitFraction * rect.width - offsetX) / scale / canvas.width, 0), 1);
+    return source === "photo" ? photoScene : null;
   }
 
-  function splitPixels(): number | null {
-    const fraction = splitCanvasFraction();
-    return fraction === null ? null : fraction * canvas.width;
+  // ---- status and notices ------------------------------------------------
+
+  function setStatus(text: string, tone: Tone): void {
+    statusText.textContent = text;
+    status.dataset.tone = tone;
+    status.hidden = false;
   }
+
+  function restingStatus(): void {
+    if (source === "sample") {
+      setStatus("Sample photo", "ready");
+    } else if (source === "photo") {
+      setStatus("Your photo", "ready");
+    }
+  }
+
+  /** The status for whatever is showing, after something else failed. */
+  function settleStatus(): void {
+    if (source === "sample" && stage.dataset.phase === "loading") {
+      setStatus("Loading the face model", "busy");
+    } else if (source === "sample" && stage.dataset.phase === "idle") {
+      status.hidden = true;
+    } else {
+      restingStatus();
+    }
+  }
+
+  function showNotice(message: string, actions: NoticeAction[]): void {
+    noticeText.textContent = message;
+    noticeActions.textContent = "";
+    for (const action of actions) {
+      const node = button(action.primary ? "btn btn--primary" : "btn btn--quiet", action.label);
+      node.addEventListener("click", () => {
+        hideNotice();
+        action.run();
+      });
+      noticeActions.append(node);
+    }
+    const dismiss = button("stage__notice-close", "Dismiss");
+    dismiss.addEventListener("click", () => {
+      hideNotice();
+      // With the notice gone, the sample still needs a way to start.
+      if (!sampleScene && !booting && source === "sample") {
+        startBtn.hidden = false;
+      }
+    });
+    noticeActions.append(dismiss);
+    notice.hidden = false;
+  }
+
+  function hideNotice(): void {
+    notice.hidden = true;
+  }
+
+  function showModelError(): void {
+    status.hidden = true;
+    stage.dataset.phase = sampleScene ? "ready" : "idle";
+    showNotice("The face model didn't load. Check your connection and try again.", [
+      { label: "Try again", run: () => void start(), primary: true },
+    ]);
+  }
+
+  // ---- geometry ----------------------------------------------------------
 
   function sizeCanvas(width: number, height: number): void {
     const longSide = Math.max(width, height);
@@ -222,6 +342,161 @@ export function createMirror(options: MirrorOptions): Mirror {
     } else {
       canvas.width = w;
       canvas.height = h;
+    }
+  }
+
+  function fitNow(): CoverFit {
+    const rect = stage.getBoundingClientRect();
+    return coverFit(
+      rect.width,
+      rect.height,
+      Math.max(canvas.width, 1),
+      Math.max(canvas.height, 1),
+      focus.fx,
+      focus.fy,
+    );
+  }
+
+  /**
+   * Where the handle sits in drawing-buffer pixels. The handle is dragged
+   * in stage coordinates while the canvas is cropped by `object-fit: cover`
+   * and aimed at the face, so without undoing both the seam would drift
+   * away from the handle the reader is holding.
+   */
+  function splitPixels(): number | null {
+    if (!compare) {
+      return null;
+    }
+    const rect = stage.getBoundingClientRect();
+    if (rect.width <= 0 || canvas.width <= 0) {
+      return null;
+    }
+    return boxToContentX(fitNow(), splitPos * rect.width, canvas.width);
+  }
+
+  /** Aims the crop at the face for stills; the camera stays centred, since
+   * chasing a moving face with the crop would make the whole frame swim. */
+  function aimAt(scene: PhotoScene | null): void {
+    const rect = stage.getBoundingClientRect();
+    focus =
+      scene && rect.width > 0 && rect.height > 0
+        ? focusOn(rect.width, rect.height, scene.width, scene.height, scene.face.cx, scene.face.cy)
+        : { fx: 0.5, fy: 0.5 };
+    const position = `${(focus.fx * 100).toFixed(2)}% ${(focus.fy * 100).toFixed(2)}%`;
+    canvas.style.objectPosition = position;
+    if (scene && scene === sampleScene) {
+      poster.style.objectPosition = position;
+    }
+  }
+
+  function positionWipe(): void {
+    const pct = `${splitPos * 100}%`;
+    wipe.style.setProperty("--split", pct);
+    wipe.setAttribute("aria-valuenow", String(Math.round(splitPos * 100)));
+    // A label with no room beside the line would hang off the stage.
+    wipe.dataset.edge = splitPos < 0.2 ? "left" : splitPos > 0.8 ? "right" : "";
+  }
+
+  function applyCompare(on: boolean): void {
+    compare = on;
+    stage.dataset.compare = on ? "on" : "off";
+    compareBtn.setAttribute("aria-pressed", String(on));
+    positionWipe();
+    requestDraw();
+  }
+
+  // ---- drawing stills ----------------------------------------------------
+
+  function lookAt(now: number): LookConfig {
+    if (blend) {
+      const t = (now - blend.start) / blend.duration;
+      if (t >= 1) {
+        shown = blend.to;
+        blend = null;
+      } else {
+        shown = mixLook(blend.from, blend.to, easeInOut(t));
+      }
+    }
+    return shown;
+  }
+
+  function applyLook(next: LookConfig, animate: boolean, duration = BLEND_MS): void {
+    target = copyLook(next);
+    // Blending redraws a still every frame; the CPU path takes hundreds of
+    // milliseconds a draw, so without WebGL2 a change lands in one step.
+    if (animate && renderer && !prefersReducedMotion()) {
+      blend = { from: shown, to: target, start: performance.now(), duration };
+    } else {
+      blend = null;
+      shown = target;
+    }
+    requestDraw();
+  }
+
+  function requestDraw(): void {
+    if (source === "camera" || drawHandle) {
+      return;
+    }
+    drawHandle = requestAnimationFrame(drawStill);
+  }
+
+  function drawStill(now: number): void {
+    drawHandle = 0;
+    const scene = currentScene();
+    if (!scene) {
+      return;
+    }
+    paintScene(scene, lookAt(now));
+    if (blend) {
+      requestDraw();
+    }
+  }
+
+  function markDrawn(): void {
+    if (stage.dataset.drawn !== "true") {
+      stage.dataset.drawn = "true";
+      saveBtn.disabled = false;
+    }
+  }
+
+  function paintScene(scene: PhotoScene, look: LookConfig): void {
+    const active = ensureRenderer();
+    if (active) {
+      sizeCanvas(scene.width, scene.height);
+      active.render(scene.source, scene.masks, look, glossFor(scene, look), {
+        mirror: false,
+        splitX: splitPixels(),
+      });
+    } else {
+      paintSceneCpu(scene, look);
+    }
+    markDrawn();
+    finishCapture();
+  }
+
+  /** The WebGL2-less path: the exact CPU reference ops at processing size. */
+  function paintSceneCpu(scene: PhotoScene, look: LookConfig): void {
+    const proc = toProcessingCanvas(scene.source, scene.width, scene.height, procCanvas);
+    const ctx = proc.getContext("2d", { willReadFrequently: true });
+    if (!ctx) {
+      return;
+    }
+    if (canvas.width !== proc.width || canvas.height !== proc.height) {
+      canvas.width = proc.width;
+      canvas.height = proc.height;
+    }
+    const out = canvas.getContext("2d");
+    if (!out) {
+      return;
+    }
+    const data = ctx.getImageData(0, 0, proc.width, proc.height);
+    const masks = masksFor(scene.landmarks, scene.width, scene.height, look);
+    const painted = applyLookCpu(toFloatPixels(data), masks, look);
+    out.putImageData(toImageData(painted, proc.width, proc.height), 0, 0);
+    const split = splitPixels();
+    if (split !== null && split > 0) {
+      // Same wipe, drawn by hand: the "before" columns come from the source.
+      out.putImageData(data, 0, 0, 0, 0, Math.round(split), proc.height);
     }
   }
 
@@ -246,14 +521,14 @@ export function createMirror(options: MirrorOptions): Mirror {
     }, "image/png");
   }
 
-  /** One pass of the pipeline over `source`, drawn into the canvas. */
-  function renderSource(
-    source: HTMLVideoElement | CanvasImageSource,
+  // ---- the live camera ---------------------------------------------------
+
+  function renderLive(
     width: number,
     height: number,
     timestampMs: number,
     landmarker: { detect: (s: TexImageSource, t: number) => Float32Array | null },
-    mirrored: boolean,
+    look: LookConfig,
   ): boolean {
     const active = ensureRenderer();
     if (!active) {
@@ -261,31 +536,24 @@ export function createMirror(options: MirrorOptions): Mirror {
     }
     sizeCanvas(width, height);
 
-    let landmarks = landmarker.detect(source as TexImageSource, timestampMs);
+    let landmarks = landmarker.detect(video, timestampMs);
     if (landmarks === null) {
       filter.reset();
-      active.render(source as TexImageSource, EMPTY_MASKS, look, {}, {
-        mirror: mirrored,
-        splitX: splitPixels(),
-      });
+      active.render(video, EMPTY_MASKS, look, {}, { mirror: true, splitX: splitPixels() });
       return false;
     }
 
-    if (steady && mirrored) {
-      // Smoothing is a preference, not a fix: our own stability measurements
-      // (see the Measured section) found no benefit on a slow, nearly still clip.
-      // It is only applied to the live stream -- a still photo has nothing
-      // to smooth across.
+    if (steady) {
+      // Smoothing is a preference, not a fix: the stability benchmark found
+      // no benefit on a slow, nearly still clip. A still photo has nothing
+      // to smooth across, so it only ever applies here.
       landmarks = Float32Array.from(filter.filter(landmarks, timestampMs / 1000));
     }
 
-    // The live path: half-resolution masks with box-approximated feathers.
-    // Building them the reference way costs hundreds of milliseconds on a
-    // face that fills the frame -- the feather radii scale with the face,
-    // not with the frame -- which is the difference between a mirror and a
-    // slideshow. Photos come through here too when WebGL2 is available; only
-    // the CPU fallback for browsers without it (renderPhotoCpu) keeps the
-    // exact construction.
+    // Half-resolution masks with box-approximated feathers. Building them
+    // the reference way costs hundreds of milliseconds on a face that fills
+    // the frame -- the feather radii scale with the face, not with the
+    // frame -- which is the difference between a mirror and a slideshow.
     const masks = masksFor(landmarks, width, height, look, "live");
 
     let gloss = {};
@@ -295,37 +563,39 @@ export function createMirror(options: MirrorOptions): Mirror {
     if (needsGloss) {
       // Sized to the mask set, not to the reference cap: the percentile
       // reduction walks masks and pixels with one index.
-      const proc = toProcessingCanvas(source, width, height, procCanvas, PROC_MAX_SIDE_LIVE);
+      const proc = toProcessingCanvas(video, width, height, procCanvas, PROC_MAX_SIDE_LIVE);
       const ctx = proc.getContext("2d", { willReadFrequently: true });
       if (ctx) {
-        const data = ctx.getImageData(0, 0, proc.width, proc.height);
-        gloss = computeGloss(toFloatPixels(data), masks, look);
+        gloss = computeGloss(toFloatPixels(ctx.getImageData(0, 0, proc.width, proc.height)), masks, look);
       }
     }
 
-    active.render(source as TexImageSource, masks, look, gloss, {
-      mirror: mirrored,
-      splitX: splitPixels(),
-    });
+    active.render(video, masks, look, gloss, { mirror: true, splitX: splitPixels() });
     return true;
   }
 
-  // ---- live loop --------------------------------------------------------
-
-  async function frame(nowMs: number): Promise<void> {
-    if (!running || mode !== "live") {
+  async function frame(nowMs: number, id: number): Promise<void> {
+    if (!running || source !== "camera" || id !== loopId) {
       return;
     }
-    const landmarker = await sharedLandmarker();
-    if (!running || mode !== "live") {
+    let landmarker;
+    try {
+      landmarker = await sharedLandmarker();
+    } catch {
+      closeCamera();
+      setSource("sample");
+      requestDraw();
+      showModelError();
+      return;
+    }
+    if (!running || source !== "camera" || id !== loopId) {
       return;
     }
 
     const width = video.videoWidth;
     const height = video.videoHeight;
     if (width > 0 && height > 0) {
-      const found = renderSource(video, width, height, nowMs, landmarker, true);
-      hudDot.style.background = found ? "" : "#e0a24d";
+      const found = renderLive(width, height, nowMs, landmarker, lookAt(nowMs));
       if (lastFrameTime > 0) {
         const delta = nowMs - lastFrameTime;
         if (delta > 0) {
@@ -335,12 +605,20 @@ export function createMirror(options: MirrorOptions): Mirror {
         }
       }
       lastFrameTime = nowMs;
-      hudText.textContent = `${Math.round(fps)} fps · ${canvas.width}×${canvas.height}${
-        found ? "" : " · no face"
-      }`;
+      // The label is text in the layout; rewriting it sixty times a second
+      // would be sixty style recalculations for a number nobody can read.
+      if (nowMs - lastStatusAt > 400) {
+        lastStatusAt = nowMs;
+        if (found) {
+          setStatus(fps > 0 ? `Live at ${Math.round(fps)} fps` : "Live", "live");
+        } else {
+          setStatus("Looking for a face", "warn");
+        }
+      }
+      markDrawn();
       finishCapture();
     }
-    schedule();
+    schedule(id);
   }
 
   type VideoFrameCapable = HTMLVideoElement & {
@@ -348,26 +626,33 @@ export function createMirror(options: MirrorOptions): Mirror {
     cancelVideoFrameCallback?: (handle: number) => void;
   };
 
-  function schedule(): void {
-    if (!running) {
+  function schedule(id: number): void {
+    if (!running || id !== loopId) {
       return;
     }
     const withVideoFrame = video as VideoFrameCapable;
     if (typeof withVideoFrame.requestVideoFrameCallback === "function") {
       usingVideoFrames = true;
       loopHandle = withVideoFrame.requestVideoFrameCallback((now) => {
-        void frame(now);
+        void frame(now, id);
       });
     } else {
       usingVideoFrames = false;
       loopHandle = requestAnimationFrame((now) => {
-        void frame(now);
+        void frame(now, id);
       });
     }
   }
 
+  function startLoop(): void {
+    loopId++;
+    running = true;
+    schedule(loopId);
+  }
+
   function stopLoop(): void {
     running = false;
+    loopId++;
     if (loopHandle) {
       // The two schedulers hand out handles from separate pools, so
       // cancelling with the wrong one would leave this loop running and
@@ -382,150 +667,450 @@ export function createMirror(options: MirrorOptions): Mirror {
     }
   }
 
-  // ---- entry points -----------------------------------------------------
+  function closeCamera(): void {
+    cameraTicket++;
+    stopLoop();
+    stopCamera(video);
+  }
 
-  function showUnsupported(): void {
-    setMode("unsupported");
-    panelMark.textContent = "No WebGL2 here";
-    panelClaim.innerHTML =
-      "The live mirror needs WebGL2 to paint a camera frame in real time. Still photos work anyway &mdash; they run the same colour maths on the CPU instead.";
-    openBtn.hidden = true;
-    panelNote.textContent = "Photo mode runs the CPU reference path";
+  // ---- sources -----------------------------------------------------------
+
+  function syncBar(): void {
+    backBtn.hidden = source === "sample";
+    steadyBtn.hidden = source !== "camera";
+  }
+
+  function setSource(next: Source): void {
+    source = next;
+    stage.dataset.source = next;
+    if (next !== "sample") {
+      // The reveal and its start button belong to the sample: neither may
+      // stay on top of a camera feed or someone's photo, whenever that
+      // arrives.
+      cancelReveal();
+      startBtn.hidden = true;
+    }
+    syncBar();
+    options.onSourceChange(next);
+  }
+
+  function showStill(which: "sample" | "photo"): void {
+    const scene = which === "sample" ? sampleScene : photoScene;
+    if (!scene) {
+      return;
+    }
+    closeCamera();
+    setSource(which);
+    aimAt(scene);
+    blend = null;
+    shown = target;
+    applyCompare(true);
+    restingStatus();
+    requestDraw();
+  }
+
+  function useCamera(): Promise<void> {
+    if (!cameraStart) {
+      cameraStart = openCamera().finally(() => {
+        cameraStart = null;
+      });
+    }
+    return cameraStart;
   }
 
   async function openCamera(): Promise<void> {
+    cancelReveal();
+    hideNotice();
     if (!ensureRenderer()) {
-      showUnsupported();
+      showNotice(
+        "The live camera needs WebGL2, which this browser doesn't offer. Photos still work.",
+        [{ label: "Use a photo", run: choosePhoto, primary: true }],
+      );
       return;
     }
-    openBtn.disabled = true;
-    panelNote.textContent = "Waiting for camera permission…";
+    if (source === "camera" && running) {
+      return;
+    }
+    const ticket = ++cameraTicket;
+    setStatus("Waiting for the camera", "busy");
     try {
       const size = await startCamera(video);
-      photoSource = null;
+      if (ticket !== cameraTicket) {
+        // Granted after the reader had already moved on to a photo.
+        stopCamera(video);
+        return;
+      }
+      setSource("camera");
       filter.reset();
       fps = 0;
       lastFrameTime = 0;
+      lastStatusAt = 0;
+      aimAt(null);
+      applyCompare(false);
       sizeCanvas(size.width, size.height);
-      setMode("live");
-      running = true;
-      schedule();
+      setStatus("Starting the camera", "busy");
+      startLoop();
     } catch {
-      setMode("denied");
-      panelMark.textContent = "No camera";
-      panelClaim.innerHTML =
-        "The camera was blocked or is in use elsewhere. You can allow it in your browser's site settings and tap again, or try a shade on a photo instead.";
-      panelNote.className = "stage__note stage__note--warn";
-      panelNote.textContent = "Nothing was uploaded — the request never left this device.";
-    } finally {
-      openBtn.disabled = false;
+      if (ticket !== cameraTicket) {
+        return;
+      }
+      settleStatus();
+      showNotice(
+        "The camera is blocked or busy in another app. Allow it in your browser's site settings and try again, or use a photo.",
+        [
+          { label: "Try again", run: () => void useCamera(), primary: true },
+          { label: "Use a photo", run: choosePhoto },
+        ],
+      );
     }
   }
 
-  function closeCamera(): void {
-    stopLoop();
-    stopCamera(video);
-    setMode("idle");
+  function choosePhoto(): void {
+    fileInput.click();
   }
 
-  /** Renders a still, on the GPU when there is one and on the CPU when not. */
-  async function showPhoto(source: CanvasImageSource, width: number, height: number): Promise<void> {
-    stopLoop();
-    stopCamera(video);
-    photoSource = source;
-    photoSize = { width, height };
-    setMode("photo");
-    await renderPhoto();
-  }
-
-  async function renderPhoto(): Promise<void> {
-    if (!photoSource) {
+  async function usePhotoFile(file: File): Promise<void> {
+    if (!file.type.startsWith("image/")) {
+      showNotice("That file isn't an image. Try a JPEG or PNG photo.", [
+        { label: "Choose a photo", run: choosePhoto, primary: true },
+      ]);
       return;
     }
-    const landmarker = await sharedLandmarker();
-    const { width, height } = photoSize;
-    const drawn = ensureRenderer()
-      ? renderSource(photoSource, width, height, performance.now(), landmarker, false)
-      : renderPhotoCpu(landmarker);
-    hudText.textContent = `photo · ${canvas.width}×${canvas.height}${drawn ? "" : " · no face"}`;
-    finishCapture();
-  }
-
-  /** The WebGL2-less path: same ops, on byte arrays, at processing size. */
-  function renderPhotoCpu(landmarker: {
-    detect: (s: TexImageSource, t: number) => Float32Array | null;
-  }): boolean {
-    if (!photoSource) {
-      return false;
-    }
-    const { width, height } = photoSize;
-    const proc = toProcessingCanvas(photoSource, width, height, procCanvas);
-    const ctx = proc.getContext("2d", { willReadFrequently: true });
-    if (!ctx) {
-      return false;
-    }
-    canvas.width = proc.width;
-    canvas.height = proc.height;
-    const out = canvas.getContext("2d");
-    if (!out) {
-      return false;
-    }
-    const landmarks = landmarker.detect(proc, performance.now());
-    const data = ctx.getImageData(0, 0, proc.width, proc.height);
-    if (landmarks === null) {
-      out.putImageData(data, 0, 0);
-      return false;
-    }
-    const masks = masksFor(landmarks, proc.width, proc.height, look);
-    const painted = applyLookCpu(toFloatPixels(data), masks, look);
-    const fraction = splitCanvasFraction();
-    const split = fraction === null ? null : Math.round(fraction * proc.width);
-    if (split !== null && split >= proc.width) {
-      out.putImageData(data, 0, 0);
-      return true;
-    }
-    out.putImageData(toImageData(painted, proc.width, proc.height), 0, 0);
-    if (split !== null && split > 0) {
-      // Same wipe, drawn by hand: the "before" columns come from the source.
-      out.putImageData(data, 0, 0, 0, 0, split, proc.height);
-    }
-    return true;
-  }
-
-  async function useSample(): Promise<void> {
-    sampleBtn.disabled = true;
+    cancelReveal();
+    hideNotice();
+    setStatus("Reading your photo", "busy");
     try {
-      const img = await loadImageElement(SAMPLE_PORTRAIT_URL);
-      await showPhoto(img, img.naturalWidth, img.naturalHeight);
-    } finally {
-      sampleBtn.disabled = false;
+      await sharedLandmarker();
+    } catch {
+      showModelError();
+      return;
+    }
+    try {
+      const picture = await loadPhoto(file);
+      const scene = await analyzePhoto(picture, picture.width, picture.height);
+      if (!scene) {
+        settleStatus();
+        showNotice("No face found in that photo. A clear, front-facing photo works best.", [
+          { label: "Try another photo", run: choosePhoto, primary: true },
+        ]);
+        return;
+      }
+      photoScene = scene;
+      showStill("photo");
+    } catch {
+      settleStatus();
+      showNotice("That photo couldn't be opened. Try a JPEG or PNG.", [
+        { label: "Choose a photo", run: choosePhoto, primary: true },
+      ]);
     }
   }
 
-  // ---- wiring -----------------------------------------------------------
+  // ---- the sample and its reveal -------------------------------------------
 
-  openBtn.addEventListener("click", () => void openCamera());
-  sampleBtn.addEventListener("click", () => void useSample());
-  uploadBtn.addEventListener("click", () => fileInput.click());
-  stopBtn.addEventListener("click", closeCamera);
+  function start(): Promise<void> {
+    if (!booting) {
+      booting = bootSample().finally(() => {
+        booting = null;
+      });
+    }
+    return booting;
+  }
+
+  async function bootSample(): Promise<void> {
+    if (sampleScene) {
+      showStill("sample");
+      return;
+    }
+    startBtn.hidden = true;
+    hideNotice();
+    stage.dataset.phase = "loading";
+    if (source === "sample") {
+      setStatus("Loading the face model", "busy");
+    }
+
+    let image: HTMLImageElement;
+    try {
+      [image] = await Promise.all([loadImageElement(SAMPLE_PORTRAIT_URL), sharedLandmarker()]);
+    } catch {
+      showModelError();
+      return;
+    }
+
+    let scene: PhotoScene | null;
+    try {
+      scene = await analyzePhoto(image, image.naturalWidth, image.naturalHeight);
+    } catch {
+      showModelError();
+      return;
+    }
+    if (!scene) {
+      stage.dataset.phase = "idle";
+      status.hidden = true;
+      showNotice("The face in the sample photo wasn't found. Try your camera or a photo instead.", []);
+      return;
+    }
+    sampleScene = scene;
+    stage.dataset.phase = "ready";
+    options.onSampleReady(scene);
+    // Someone who went straight for the camera or a photo while the model
+    // loaded has already moved on; the reveal is only for the sample.
+    if (source === "sample") {
+      await reveal(scene);
+    }
+  }
+
+  /** Runs `step(t)` for t from 0 to 1 over `duration`; false if cancelled. */
+  function animate(duration: number, step: (t: number) => void, token: number): Promise<boolean> {
+    return new Promise((resolve) => {
+      const begin = performance.now();
+      const tick = (now: number) => {
+        if (token !== revealToken) {
+          resolve(false);
+          return;
+        }
+        const t = Math.min((now - begin) / duration, 1);
+        step(t);
+        if (t < 1) {
+          requestAnimationFrame(tick);
+        } else {
+          resolve(true);
+        }
+      };
+      requestAnimationFrame(tick);
+    });
+  }
+
+  async function reveal(scene: PhotoScene): Promise<void> {
+    const token = ++revealToken;
+    setSource("sample");
+    aimAt(scene);
+    splitPos = 0.5;
+
+    if (prefersReducedMotion() || !ensureRenderer()) {
+      blend = null;
+      shown = target;
+      applyCompare(true);
+      restingStatus();
+      return;
+    }
+
+    revealing = true;
+    // The canvas takes over from the poster showing the same bare picture,
+    // so the swap cannot be seen and everything after it is the engine.
+    applyCompare(false);
+    blend = null;
+    shown = withoutMakeup(target);
+    paintScene(scene, shown);
+    const art = revealArt(scene);
+
+    setStatus(`Found the face: ${FACTS.landmarks} points`, "ready");
+    if (!(await animate(REVEAL_MS.dots, (t) => art.draw(t, 1, 0), token))) {
+      return;
+    }
+    setStatus("Drawing a soft mask for each product", "ready");
+    if (!(await animate(REVEAL_MS.masks, (t) => art.draw(1, 1 - 0.55 * t, easeInOut(t)), token))) {
+      return;
+    }
+    setStatus("Changing the colour, keeping the texture", "ready");
+    applyLook(target, true, REVEAL_MS.tint);
+    const tinted = await animate(
+      REVEAL_MS.tint,
+      (t) => art.draw(1, 0.45 * (1 - t), 1 - easeInOut(t)),
+      token,
+    );
+    if (!tinted) {
+      return;
+    }
+    art.clear();
+    splitPos = 0;
+    applyCompare(true);
+    const wiped = await animate(
+      REVEAL_MS.wipe,
+      (t) => {
+        splitPos = 0.5 * easeInOut(t);
+        positionWipe();
+        requestDraw();
+      },
+      token,
+    );
+    if (!wiped) {
+      return;
+    }
+    revealing = false;
+    restingStatus();
+    wipe.classList.add("wipe--hint");
+  }
+
+  /** Stops the reveal where it is and settles on the resting state. */
+  function cancelReveal(): void {
+    if (!revealing) {
+      return;
+    }
+    revealing = false;
+    revealToken++;
+    clearOverlay();
+    // Stopped before the colour went on, the face would stay bare: blend
+    // the look in from wherever the reveal left it.
+    if (!blend) {
+      applyLook(target, true);
+    }
+    if (source === "sample") {
+      splitPos = 0.5;
+      applyCompare(true);
+      restingStatus();
+    }
+  }
+
+  function clearOverlay(): void {
+    overlay.getContext("2d")?.clearRect(0, 0, overlay.width, overlay.height);
+  }
+
+  /**
+   * The reveal's drawing: the landmark points rippling out from the middle
+   * of the face, and every mask the look will paint, each in its own shade.
+   * Both are placed with the same cover fit the canvas is drawn with, so
+   * they sit exactly on the features they belong to.
+   */
+  function revealArt(scene: PhotoScene): { draw(appear: number, dots: number, masks: number): void; clear(): void } {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const rect = stage.getBoundingClientRect();
+    overlay.width = Math.max(1, Math.round(rect.width * dpr));
+    overlay.height = Math.max(1, Math.round(rect.height * dpr));
+    const ctx = overlay.getContext("2d");
+    if (!ctx) {
+      return { draw() {}, clear() {} };
+    }
+
+    const toBuffer = canvas.width / scene.width;
+    const fit = fitNow();
+
+    const BUCKETS = 12;
+    const buckets: number[][] = Array.from({ length: BUCKETS }, () => []);
+    const reach = Math.hypot(scene.face.width, scene.face.height) / 2 || 1;
+    for (let i = 0; i + 1 < scene.landmarks.length; i += 2) {
+      const x = scene.landmarks[i];
+      const y = scene.landmarks[i + 1];
+      const [bx, by] = contentToBox(fit, x * toBuffer, y * toBuffer);
+      const distance = Math.min(Math.hypot(x - scene.face.cx, y - scene.face.cy) / reach, 0.999);
+      buckets[Math.floor(distance * BUCKETS)].push(bx * dpr, by * dpr);
+    }
+
+    const { masks } = scene;
+    const maskArt = document.createElement("canvas");
+    maskArt.width = masks.width;
+    maskArt.height = masks.height;
+    const maskCtx = maskArt.getContext("2d");
+    if (maskCtx) {
+      const image = maskCtx.createImageData(masks.width, masks.height);
+      const px = image.data;
+      for (const name of PRODUCT_ORDER) {
+        const mask = masks.masks[name];
+        if (!mask || target[name].intensity <= 0) {
+          continue;
+        }
+        const [r, g, b] = hexToRgb(target[name].color);
+        for (let i = 0; i < mask.length; i++) {
+          const a = mask[i] * 0.85;
+          if (a < 0.01) {
+            continue;
+          }
+          const p = i * 4;
+          const under = px[p + 3] / 255;
+          const outA = a + under * (1 - a);
+          px[p] = (r * a + px[p] * under * (1 - a)) / outA;
+          px[p + 1] = (g * a + px[p + 1] * under * (1 - a)) / outA;
+          px[p + 2] = (b * a + px[p + 2] * under * (1 - a)) / outA;
+          px[p + 3] = outA * 255;
+        }
+      }
+      maskCtx.putImageData(image, 0, 0);
+    }
+    const maskScale = (toBuffer / masks.scale) * fit.scale * dpr;
+    const radius = 1.45 * dpr;
+
+    return {
+      draw(appear, dots, maskAlpha) {
+        ctx.clearRect(0, 0, overlay.width, overlay.height);
+        if (maskAlpha > 0) {
+          ctx.globalAlpha = maskAlpha;
+          ctx.imageSmoothingQuality = "high";
+          ctx.drawImage(
+            maskArt,
+            fit.offsetX * dpr,
+            fit.offsetY * dpr,
+            masks.width * maskScale,
+            masks.height * maskScale,
+          );
+        }
+        if (dots > 0) {
+          for (let b = 0; b < BUCKETS; b++) {
+            const local = Math.min(Math.max((appear - (b / BUCKETS) * 0.65) / 0.35, 0), 1);
+            const alpha = local * dots;
+            if (alpha <= 0) {
+              continue;
+            }
+            const points = buckets[b];
+            const r = radius * (0.5 + 0.5 * local);
+            ctx.globalAlpha = alpha * 0.45;
+            ctx.fillStyle = "#1a0d10";
+            ctx.beginPath();
+            for (let i = 0; i < points.length; i += 2) {
+              ctx.moveTo(points[i] + r + dpr, points[i + 1]);
+              ctx.arc(points[i], points[i + 1], r + dpr, 0, Math.PI * 2);
+            }
+            ctx.fill();
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = "#ffffff";
+            ctx.beginPath();
+            for (let i = 0; i < points.length; i += 2) {
+              ctx.moveTo(points[i] + r, points[i + 1]);
+              ctx.arc(points[i], points[i + 1], r, 0, Math.PI * 2);
+            }
+            ctx.fill();
+          }
+        }
+        ctx.globalAlpha = 1;
+      },
+      clear: clearOverlay,
+    };
+  }
+
+  // ---- wiring ------------------------------------------------------------
+
+  startBtn.addEventListener("click", () => void start());
+  backBtn.addEventListener("click", () => {
+    hideNotice();
+    if (sampleScene) {
+      showStill("sample");
+    } else {
+      closeCamera();
+      setSource("sample");
+      void start();
+    }
+  });
 
   fileInput.addEventListener("change", () => {
     const file = fileInput.files?.[0];
     if (file) {
-      void loadPhoto(file).then((photo) => showPhoto(photo, photo.width, photo.height));
+      void usePhotoFile(file);
     }
     fileInput.value = "";
   });
 
-  // Drop a photo anywhere on the stage.
+  // Drop a photo anywhere on the mirror.
   stage.addEventListener("dragover", (event) => {
     event.preventDefault();
+    stage.dataset.dragging = "true";
+  });
+  stage.addEventListener("dragleave", () => {
+    delete stage.dataset.dragging;
   });
   stage.addEventListener("drop", (event) => {
     event.preventDefault();
+    delete stage.dataset.dragging;
     const file = event.dataTransfer?.files?.[0];
-    if (file && file.type.startsWith("image/")) {
-      void loadPhoto(file).then((photo) => showPhoto(photo, photo.width, photo.height));
+    if (file) {
+      void usePhotoFile(file);
     }
   });
 
@@ -535,37 +1120,33 @@ export function createMirror(options: MirrorOptions): Mirror {
     filter = new OneEuroFilter();
   });
 
-  function setWipe(on: boolean): void {
-    splitFraction = on ? 0.5 : null;
-    stage.dataset.wipe = on ? "on" : "off";
-    wipeBtn.setAttribute("aria-pressed", String(on));
-    positionWipe();
-    if (mode === "photo") {
-      void renderPhoto();
+  compareBtn.addEventListener("click", () => {
+    // Read first: cancelling the reveal settles on the split, and the
+    // click is about the state the reader saw.
+    const wasOn = compare;
+    cancelReveal();
+    if (!wasOn) {
+      splitPos = 0.5;
     }
-  }
+    applyCompare(!wasOn);
+  });
 
-  function positionWipe(): void {
-    const fraction = splitFraction ?? 0.5;
-    const pct = `${fraction * 100}%`;
-    wipeLine.style.left = pct;
-    wipeGrip.style.left = pct;
-    wipe.setAttribute("aria-valuenow", String(Math.round(fraction * 100)));
-  }
-
-  wipeBtn.addEventListener("click", () => setWipe(splitFraction === null));
+  saveBtn.addEventListener("click", () => {
+    pendingCapture = true;
+    requestDraw();
+  });
 
   let dragging = false;
   function moveWipe(clientX: number): void {
     const rect = stage.getBoundingClientRect();
-    splitFraction = Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1);
+    splitPos = Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1);
     positionWipe();
-    if (mode === "photo") {
-      void renderPhoto();
-    }
+    requestDraw();
   }
 
   wipe.addEventListener("pointerdown", (event) => {
+    cancelReveal();
+    wipe.classList.remove("wipe--hint");
     dragging = true;
     wipe.setPointerCapture(event.pointerId);
     moveWipe(event.clientX);
@@ -591,7 +1172,7 @@ export function createMirror(options: MirrorOptions): Mirror {
   wipe.setAttribute("aria-valuemax", "100");
   wipe.addEventListener("keydown", (event) => {
     const step = event.shiftKey ? 0.1 : 0.02;
-    let next = splitFraction ?? 0.5;
+    let next = splitPos;
     if (event.key === "ArrowLeft") {
       next -= step;
     } else if (event.key === "ArrowRight") {
@@ -604,33 +1185,42 @@ export function createMirror(options: MirrorOptions): Mirror {
       return;
     }
     event.preventDefault();
-    splitFraction = Math.min(Math.max(next, 0), 1);
+    cancelReveal();
+    wipe.classList.remove("wipe--hint");
+    splitPos = Math.min(Math.max(next, 0), 1);
     positionWipe();
-    if (mode === "photo") {
-      void renderPhoto();
-    }
+    requestDraw();
   });
 
-  captureBtn.addEventListener("click", () => {
-    pendingCapture = true;
-    if (mode === "photo") {
-      void renderPhoto();
-    }
-  });
+  // The crop follows the face, and the right crop depends on the stage's
+  // shape, which changes with the window.
+  if (typeof ResizeObserver === "function") {
+    new ResizeObserver(() => {
+      aimAt(currentScene());
+      requestDraw();
+    }).observe(stage);
+  }
 
   positionWipe();
-  setMode("idle");
-  if (typeof document !== "undefined" && !ensureRenderer()) {
-    showUnsupported();
+  syncBar();
+  if (!ensureRenderer()) {
+    // No WebGL2: photos still work through the CPU reference path.
+    stage.dataset.gl = "none";
+  }
+  if (options.autostart) {
+    setTimeout(() => void start(), 0);
+  } else {
+    startBtn.hidden = false;
   }
 
   return {
     element: root,
-    setLook(next: LookConfig) {
-      look = next;
-      if (mode === "photo") {
-        void renderPhoto();
-      }
+    setLook(next, animate) {
+      cancelReveal();
+      applyLook(next, animate);
     },
+    start: () => void start(),
+    useCamera: () => void useCamera(),
+    choosePhoto,
   };
 }

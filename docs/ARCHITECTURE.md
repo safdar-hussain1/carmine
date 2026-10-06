@@ -90,7 +90,9 @@ Nothing crosses between the surfaces at runtime. They meet only at build time
 | `lib/selftest.ts` | the `?selftest=1` check registry |
 | `lib/camera.ts` | getUserMedia lifecycle |
 | `ui/pipeline.ts` | shared landmarker, gloss percentiles, CPU still-render fallback |
-| `ui/mirror.ts`, `ui/rail.ts`, `ui/shades.ts`, `ui/measured.ts`, `ui/sections.ts` | the page |
+| `ui/scene.ts` | a still picture analysed once: landmarks, every mask, gloss percentiles |
+| `ui/mirror.ts`, `ui/rail.ts`, `ui/explainer.ts`, `ui/sections.ts` | the page: the mirror and its opening reveal, the look and product controls, the four steps drawn live, the markup |
+| `ui/tween.ts`, `ui/geometry.ts`, `ui/facts.ts`, `ui/shades.ts` | blending between looks, the cover-crop mapping, the figures the page quotes, the shade catalogue |
 
 ---
 
@@ -179,7 +181,7 @@ check that needs a frame uses the bundled demo portrait.
 | `landmarker-init` | the wasm runtime instantiates and the bundled model loads |
 | `renderer-compiles` | a real GL driver accepts the fragment shader, and no GL error after one frame |
 | `presets-valid` | four presets, every colour a valid hex, every intensity in range |
-| `ui-mounts` | the rail, the preset chips and the mirror canvas are actually in the DOM |
+| `ui-mounts` | the product panels, the four look buttons and the mirror canvas are actually in the DOM |
 | `pipeline-canned-frame` | detect → mask → render changes the face by >1% of pixels and leaves the corners bit-stable |
 | `parity-cpu` | the CPU path matches the Python renders within the ΔE gates (**gated**) |
 | `parity-gpu` | the shader path measured against the same renders (report-only) |
@@ -201,7 +203,8 @@ fails if the registered count ever changes silently.
 | `reports/figures/*.png` | `scripts/make_figures.py`, `scripts/preview_masks.py` | the published figures |
 | `notebooks/01_engine_and_benchmarks.ipynb` | `scripts/build_notebook.py` | the write-up, which reads the two JSON files and asserts every number it narrates |
 
-Numbers are never typed into prose. The site's Measured section imports
-`benchmark.json` at build time; the notebook reads both files and fails to
+Numbers are never typed into prose. The few figures the site quotes are
+imported from both reports at build time (`ui/facts.ts`, pinned by
+`ui/facts.test.ts`); the notebook reads both files and fails to
 execute if the prose has drifted; `tests/test_metrics.py` and
 `tests/test_parity_report.py` validate the committed files themselves.

@@ -2,9 +2,9 @@
 
 LinkedIn, Slack, WhatsApp and X show this image in a link preview, so it is a
 real screenshot of the page rather than a drawn card: the built site (docs/)
-is served locally and opened in headless Chrome at 1200x630, the sample
-portrait is loaded, the velvet look is picked, the before/after split is
-switched on, and the viewport is captured once the photo has rendered.
+is served locally and opened in headless Chrome at 1200x630, the demo runs
+the sample portrait by itself, and once its opening sequence has settled on
+the before/after split the velvet look is picked and the viewport captured.
 
 A screenshot goes stale when the page changes, which is why this is a script.
 It captures docs/, and the image reaches docs/ through web/public/ on the
@@ -41,17 +41,13 @@ from verify_site import (
 OUT_PATH = REPO_ROOT / "web" / "public" / "og-image.png"
 WIDTH, HEIGHT = 1200, 630
 MAX_BYTES = 500 * 1024
-# How far down the page to scroll: past the headline, so the whole face on
-# the mirror is in frame under the pinned masthead.
-SCROLL_Y = 300
 
-CLICK_BUTTON = (
-    "[...document.querySelectorAll('button')]"
-    ".find((b) => b.textContent.trim() === {label!r}).click()"
-)
+# The status line the mirror settles on once the sample is drawn and the
+# opening sequence has finished.
+SAMPLE_READY = "document.querySelector('.stage__status-text')?.textContent === 'Sample photo'"
 CLICK_PRESET = (
     "[...document.querySelectorAll('.preset')]"
-    ".find((b) => b.textContent.trim() === {label!r}).click()"
+    ".find((b) => b.querySelector('.preset__name')?.textContent.trim() === {label!r}).click()"
 )
 
 
@@ -147,18 +143,10 @@ def capture(theme: str, timeout: float) -> bytes:
             timeout,
             "the mirror to mount",
         )
-        page.evaluate(CLICK_BUTTON.format(label="Sample portrait"))
-        page.wait_for(
-            "document.querySelector('.hud__text')?.textContent.startsWith('photo')",
-            timeout,
-            "the sample portrait to render",
-        )
-        # Each of these re-renders the photo; give each one time to land.
-        page.evaluate(CLICK_PRESET.format(label="velvet"))
-        time.sleep(1.0)
-        page.evaluate(CLICK_BUTTON.format(label="Before / after"))
-        time.sleep(1.0)
-        page.evaluate(f"window.scrollTo({{top: {SCROLL_Y}, behavior: 'instant'}})")
+        page.wait_for(SAMPLE_READY, timeout, "the sample portrait to render")
+        # Picking a look blends into it; give the blend time to finish.
+        page.evaluate(CLICK_PRESET.format(label="Velvet"))
+        time.sleep(1.5)
         page.evaluate("new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))")
         time.sleep(0.5)
         shot = page.call("Page.captureScreenshot", format="png")

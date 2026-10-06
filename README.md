@@ -288,8 +288,8 @@ turns the count check off). `build_notebook.py` takes `--kernel NAME` (default
 `python3`); `make_og_image.py` takes `--theme light|dark` and `--out PATH`.
 
 **Why the built site needs a server.** `docs/index.html` loads its script as an
-ES module and its stylesheet with `crossorigin`, and fetches the face model and
-the wasm runtime when the mirror opens. Browsers refuse all of that from a
+ES module and its stylesheet with `crossorigin`, and fetches the sample portrait,
+the face model and the wasm runtime as soon as it opens. Browsers refuse all of that from a
 `file://` page, so opening the file directly shows an unstyled headline and
 nothing else. Any static server works; the one above ships with Python.
 
@@ -320,15 +320,15 @@ products composite in a single fragment pass — no intermediate buffers, which
 on a phone would cost more than every colour operation combined.
 
 **Privacy is a claim about network traffic, so it is checkable.** The landmark
-model and the wasm runtime are served from the same origin instead of a CDN,
-type is set in system fonts, and there are no analytics: every request the page
-makes goes to its own site, and once the mirror has loaded its model (the first
-time you open it) it makes **no** further requests, apart from the sample
-portrait (one photo from the same site) if you press that button. Open the
-Network panel, reload, open the mirror, then change shades and capture: the
-list stops growing. Or turn the network off once the mirror is running and keep using it.
-Captures save through your own browser's download; nothing is written anywhere
-else.
+model, the wasm runtime and the one web font are served from the same origin
+instead of a CDN, and there are no analytics: every request the page makes goes
+to its own site. It loads the sample portrait and the model as soon as it opens
+(when the browser asks to save data, or the connection is 2G-slow, the demo waits
+for a click instead), and once the model has loaded it makes **no** further
+requests. Open the Network panel, reload, let the mirror settle, then change
+shades, open the camera and save a photo: the list stops growing. Or turn the
+network off once the mirror is running and keep using it. Saved photos go
+through your own browser's download; nothing is written anywhere else.
 
 The built site carries its own acceptance test. Load it with `?selftest=1` and
 the tab title reports the result — `SELFTEST PASS n=9 skipped=2` on the
@@ -350,7 +350,7 @@ src/carmine/          the engine: landmarks, regions, masks, pigment, look, engi
                       plus baselines.py (failure modes) and metrics.py (scorers)
 web/index.html        the page template: head, search and link-preview metadata
 web/src/engine/       the browser port: masks, pigment, colour, blur, look, renderer
-web/src/ui/           the mirror: stage, shade rail, measured section, pipeline
+web/src/ui/           the page: mirror, look and product controls, the four steps, pipeline
 web/src/lib/          landmarker, camera, selftest, parity and timing harnesses
 web/src/gen/          constants.json + test_vectors.json, generated from Python
 web/public/           bundled model and wasm, demo portraits, favicon, og-image,

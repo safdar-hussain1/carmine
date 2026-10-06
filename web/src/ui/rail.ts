@@ -1,19 +1,29 @@
 /**
- * The product rail -- the counter side of the page.
+ * The controls beside the mirror: four looks, then one product at a time.
  *
- * Every control here edits one field of the `LookConfig` the mirror renders,
- * and the rail never holds a copy of the look: it is handed the current one
- * on every refresh and redraws its selected states from it. That is what
- * keeps a preset chip, a swatch and the shade card underneath the mirror
- * from ever disagreeing about which shade is on your face.
+ * Every control edits one field of the `LookConfig` the mirror renders, and
+ * the rail never trusts a copy of its own: it is handed the current look on
+ * every refresh and redraws its selected states from it. That is what keeps
+ * a look, a tab's colour dot and a swatch from ever disagreeing about which
+ * shade is on the face.
+ *
+ * Products sit behind tabs rather than in one long column. Six products
+ * with a dozen or more shades each is a lot to take in at once; a tab row
+ * that names each product with the shade it is wearing gives the whole
+ * look at a glance, and opens one product's choices when you want them.
  *
  * Switching a product off sets its intensity to zero (which is what the
- * engine reads), but the rail remembers the intensity it had so switching
+ * engine reads), but the rail remembers the intensity it had, so switching
  * back on returns you to your setting rather than to a default.
  */
 
 import { PRESETS, type Finish, type LookConfig, type ProductName } from "../engine/look";
 import { FINISHES, PRODUCTS, type ProductMeta } from "./shades";
+
+/** What changed, so the page can decide whether to blend or cut. Sliders
+ * cut: a drag already moves continuously, and blending would make the face
+ * lag behind the thumb. */
+export type Change = "look" | "shade" | "toggle" | "finish" | "intensity";
 
 export interface Rail {
   element: HTMLElement;
@@ -22,11 +32,22 @@ export interface Rail {
 
 interface RailOptions {
   look: LookConfig;
-  onChange(look: LookConfig): void;
+  onChange(look: LookConfig, change: Change): void;
 }
 
-/** Order the preset chips are shown in: lightest look to boldest. */
-const PRESET_ORDER = ["bare", "everyday", "velvet", "glass"];
+interface LookMeta {
+  name: string;
+  label: string;
+  note: string;
+}
+
+/** Lightest to boldest, each with the one line that tells them apart. */
+const LOOKS: LookMeta[] = [
+  { name: "bare", label: "Bare", note: "A tint on lips and brows" },
+  { name: "everyday", label: "Everyday", note: "Soft, all-over colour" },
+  { name: "velvet", label: "Velvet", note: "Deep matte lip, liner" },
+  { name: "glass", label: "Glass", note: "Gloss and glow" },
+];
 
 function clone(look: LookConfig): LookConfig {
   return {
@@ -55,14 +76,14 @@ function sameLook(a: LookConfig, b: LookConfig): boolean {
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   className?: string,
-  html?: string,
+  text?: string,
 ): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
   if (className) {
     node.className = className;
   }
-  if (html !== undefined) {
-    node.innerHTML = html;
+  if (text !== undefined) {
+    node.textContent = text;
   }
   return node;
 }
@@ -73,79 +94,106 @@ export function createRail(options: RailOptions): Rail {
   const remembered = new Map<ProductName, number>();
 
   const root = el("div", "rail");
-  root.setAttribute("aria-label", "Products");
 
-  const emit = () => {
-    options.onChange(clone(look));
+  const emit = (change: Change) => {
+    options.onChange(clone(look), change);
     refresh(look);
   };
 
-  // ---- preset looks -----------------------------------------------------
+  // ---- looks ------------------------------------------------------------
 
-  const presetSection = el("section", "rail__section");
-  presetSection.append(el("h2", "rail__label", "Looks"));
+  const looksGroup = el("section", "rail__group");
+  const looksTitle = el("h2", "rail__title", "Start from a look");
+  looksTitle.id = "looks-title";
+  looksGroup.setAttribute("aria-labelledby", looksTitle.id);
   const presetGrid = el("div", "presets");
   const presetButtons: Array<{ name: string; node: HTMLButtonElement }> = [];
 
-  for (const name of PRESET_ORDER) {
-    const preset = PRESETS[name];
+  for (const meta of LOOKS) {
+    const preset = PRESETS[meta.name];
     if (!preset) {
       continue;
     }
     const node = el("button", "preset");
     node.type = "button";
     node.setAttribute("aria-pressed", "false");
-    const swatches = el("span", "preset__swatches");
-    for (const product of ["lipstick", "eyeshadow", "blush", "highlighter"] as ProductName[]) {
-      if (preset[product].intensity <= 0) {
+    const pans = el("span", "preset__pans");
+    pans.setAttribute("aria-hidden", "true");
+    for (const product of PRODUCTS) {
+      if (preset[product.name].intensity <= 0) {
         continue;
       }
-      const dot = el("span");
-      dot.style.background = preset[product].color;
-      swatches.append(dot);
+      const pan = el("span");
+      pan.style.setProperty("--pan", preset[product.name].color);
+      pans.append(pan);
     }
-    node.append(swatches, el("span", "preset__name", name));
+    node.append(pans, el("span", "preset__name", meta.label), el("span", "preset__note", meta.note));
     node.addEventListener("click", () => {
       look = clone(preset);
       remembered.clear();
-      emit();
+      emit("look");
     });
     presetGrid.append(node);
-    presetButtons.push({ name, node });
+    presetButtons.push({ name: meta.name, node });
   }
-  presetSection.append(presetGrid);
-  root.append(presetSection);
+  looksGroup.append(looksTitle, presetGrid);
+  root.append(looksGroup);
 
-  // ---- products ---------------------------------------------------------
+  // ---- products -----------------------------------------------------------
 
   interface ProductControls {
     meta: ProductMeta;
-    section: HTMLElement;
+    tab: HTMLButtonElement;
+    tabDot: HTMLElement;
+    panel: HTMLElement;
     toggle: HTMLButtonElement;
-    shadeLabel: HTMLElement;
+    shadeName: HTMLElement;
     swatches: HTMLButtonElement[];
     slider: HTMLInputElement;
-    sliderValue: HTMLElement;
+    sliderValue: HTMLOutputElement;
     finishButtons: Array<{ value: Finish; node: HTMLButtonElement }>;
   }
 
+  const productsGroup = el("section", "rail__group");
+  const productsTitle = el("h2", "rail__title", "Adjust each product");
+  productsTitle.id = "products-title";
+  productsGroup.setAttribute("aria-labelledby", productsTitle.id);
+
+  const tabList = el("div", "tabs");
+  tabList.setAttribute("role", "tablist");
+  tabList.setAttribute("aria-labelledby", productsTitle.id);
+  productsGroup.append(productsTitle, tabList);
+
   const controls: ProductControls[] = [];
+  let selected: ProductName = PRODUCTS[0].name;
 
   for (const meta of PRODUCTS) {
-    const section = el("section", "rail__section product");
-    section.dataset.product = meta.name;
+    const tab = el("button", "tab");
+    tab.type = "button";
+    tab.id = `tab-${meta.name}`;
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-controls", `panel-${meta.name}`);
+    const tabDot = el("span", "tab__dot");
+    tabDot.setAttribute("aria-hidden", "true");
+    tab.append(tabDot, el("span", "tab__label", meta.label));
+    tabList.append(tab);
+
+    const panel = el("div", "product");
+    panel.id = `panel-${meta.name}`;
+    panel.dataset.product = meta.name;
+    panel.setAttribute("role", "tabpanel");
+    panel.setAttribute("aria-labelledby", tab.id);
+    panel.tabIndex = -1;
 
     const head = el("div", "product__head");
-    const heading = el("h3", "product__name", meta.label);
-    const shadeLabel = el("span", "product__shade");
+    const shadeName = el("p", "product__shade");
+    shadeName.setAttribute("aria-live", "polite");
     const toggle = el("button", "switch");
     toggle.type = "button";
     toggle.setAttribute("role", "switch");
     toggle.setAttribute("aria-checked", "false");
-    toggle.setAttribute("aria-label", `Turn ${meta.label.toLowerCase()} on or off`);
-    head.append(heading, shadeLabel, toggle);
-
-    const body = el("div", "product__body");
+    toggle.setAttribute("aria-label", `Wear ${meta.label.toLowerCase()}`);
+    head.append(shadeName, toggle);
 
     const swatchRow = el("div", "swatches");
     swatchRow.setAttribute("role", "group");
@@ -154,7 +202,7 @@ export function createRail(options: RailOptions): Rail {
     for (const shade of meta.shades) {
       const node = el("button", "swatch");
       node.type = "button";
-      node.style.setProperty("--shade", shade.hex);
+      node.style.setProperty("--swatch", shade.hex);
       node.title = shade.name;
       node.setAttribute("aria-label", shade.name);
       node.setAttribute("aria-pressed", "false");
@@ -164,32 +212,45 @@ export function createRail(options: RailOptions): Rail {
         if (look[meta.name].intensity <= 0) {
           look[meta.name].intensity = remembered.get(meta.name) ?? meta.defaultIntensity;
         }
-        emit();
+        emit("shade");
       });
+      // Pointing at a swatch previews its name where the worn shade's name
+      // sits, so the range can be read without committing to anything.
+      const preview = () => {
+        shadeName.dataset.preview = "true";
+        shadeName.textContent = shade.name;
+      };
+      node.addEventListener("pointerenter", preview);
+      node.addEventListener("focus", preview);
+      node.addEventListener("pointerleave", () => refresh(look));
+      node.addEventListener("blur", () => refresh(look));
       swatchRow.append(node);
       swatches.push(node);
     }
 
     const sliderRow = el("div", "slider");
-    const sliderLabel = el("span", undefined, "Intensity");
-    const slider = el("input");
+    const sliderId = `intensity-${meta.name}`;
+    const sliderLabel = el("label", "slider__label", "Intensity");
+    sliderLabel.htmlFor = sliderId;
+    const slider = el("input", "slider__input");
+    slider.id = sliderId;
     slider.type = "range";
     slider.min = "0";
     slider.max = "100";
     slider.step = "1";
-    slider.setAttribute("aria-label", `${meta.label} intensity`);
-    const sliderValue = el("span", "slider__value", "0%");
+    const sliderValue = el("output", "slider__value", "0%");
+    sliderValue.htmlFor.add(sliderId);
     slider.addEventListener("input", () => {
       const value = Number(slider.value) / 100;
       look[meta.name].intensity = value;
       if (value > 0) {
         remembered.set(meta.name, value);
       }
-      emit();
+      emit("intensity");
     });
     sliderRow.append(sliderLabel, slider, sliderValue);
 
-    body.append(swatchRow, sliderRow);
+    panel.append(head, swatchRow, sliderRow);
 
     const finishButtons: Array<{ value: Finish; node: HTMLButtonElement }> = [];
     if (meta.hasFinish) {
@@ -197,22 +258,21 @@ export function createRail(options: RailOptions): Rail {
       segmented.setAttribute("role", "group");
       segmented.setAttribute("aria-label", "Lipstick finish");
       for (const finish of FINISHES) {
-        const node = el("button");
+        const node = el("button", undefined, finish.label);
         node.type = "button";
-        node.textContent = finish.label;
         node.title = finish.note;
         node.setAttribute("aria-pressed", "false");
         node.addEventListener("click", () => {
           look[meta.name].finish = finish.value;
-          emit();
+          emit("finish");
         });
         segmented.append(node);
         finishButtons.push({ value: finish.value, node });
       }
-      body.append(segmented);
+      panel.append(segmented);
     }
 
-    body.append(el("p", "product__blurb", meta.blurb));
+    panel.append(el("p", "product__blurb", meta.blurb));
 
     toggle.addEventListener("click", () => {
       const on = look[meta.name].intensity > 0;
@@ -222,13 +282,58 @@ export function createRail(options: RailOptions): Rail {
       } else {
         look[meta.name].intensity = remembered.get(meta.name) ?? meta.defaultIntensity;
       }
-      emit();
+      emit("toggle");
     });
 
-    section.append(head, body);
-    root.append(section);
-    controls.push({ meta, section, toggle, shadeLabel, swatches, slider, sliderValue, finishButtons });
+    tab.addEventListener("click", () => select(meta.name));
+    productsGroup.append(panel);
+    controls.push({
+      meta,
+      tab,
+      tabDot,
+      panel,
+      toggle,
+      shadeName,
+      swatches,
+      slider,
+      sliderValue,
+      finishButtons,
+    });
   }
+  root.append(productsGroup);
+
+  function select(name: ProductName, focusTab = false): void {
+    selected = name;
+    for (const control of controls) {
+      const active = control.meta.name === name;
+      control.tab.setAttribute("aria-selected", String(active));
+      control.tab.tabIndex = active ? 0 : -1;
+      control.panel.hidden = !active;
+      if (active && focusTab) {
+        control.tab.focus();
+      }
+    }
+  }
+
+  // Arrow keys move between tabs, as the tab pattern promises; selection
+  // follows focus, since showing a panel costs nothing.
+  tabList.addEventListener("keydown", (event) => {
+    const index = controls.findIndex((control) => control.meta.name === selected);
+    let next = index;
+    if (event.key === "ArrowRight") {
+      next = (index + 1) % controls.length;
+    } else if (event.key === "ArrowLeft") {
+      next = (index - 1 + controls.length) % controls.length;
+    } else if (event.key === "Home") {
+      next = 0;
+    } else if (event.key === "End") {
+      next = controls.length - 1;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    select(controls[next].meta.name, true);
+  });
 
   function refresh(next: LookConfig): void {
     look = clone(next);
@@ -240,12 +345,23 @@ export function createRail(options: RailOptions): Rail {
     for (const control of controls) {
       const product = look[control.meta.name];
       const on = product.intensity > 0;
-      control.section.dataset.on = String(on);
-      control.toggle.setAttribute("aria-checked", String(on));
       const shade = control.meta.shades.find(
         (s) => s.hex.toLowerCase() === product.color.toLowerCase(),
       );
-      control.shadeLabel.textContent = on ? (shade?.name ?? product.color) : "off";
+      const name = shade?.name ?? product.color;
+
+      control.panel.dataset.on = String(on);
+      control.panel.style.setProperty("--product", product.color);
+      control.tab.dataset.on = String(on);
+      control.tabDot.style.setProperty("--dot", product.color);
+      control.tab.setAttribute(
+        "aria-label",
+        `${control.meta.label}: ${on ? name : "off"}`,
+      );
+      control.toggle.setAttribute("aria-checked", String(on));
+      delete control.shadeName.dataset.preview;
+      control.shadeName.textContent = on ? name : `${control.meta.label} off`;
+
       for (const swatch of control.swatches) {
         swatch.setAttribute(
           "aria-pressed",
@@ -254,6 +370,7 @@ export function createRail(options: RailOptions): Rail {
       }
       const percent = Math.round(product.intensity * 100);
       control.slider.value = String(percent);
+      control.slider.style.setProperty("--fill", `${percent}%`);
       control.sliderValue.textContent = `${percent}%`;
       for (const finish of control.finishButtons) {
         finish.node.setAttribute("aria-pressed", String(finish.value === product.finish));
@@ -261,6 +378,7 @@ export function createRail(options: RailOptions): Rail {
     }
   }
 
+  select(selected);
   refresh(options.look);
 
   return { element: root, refresh };

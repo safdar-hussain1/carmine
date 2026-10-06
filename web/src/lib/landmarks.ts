@@ -65,8 +65,20 @@ export async function createLandmarker(modelUrl: string): Promise<Landmarker> {
 
   return {
     detect(source: TexImageSource, timestampMs: number): Float32Array | null {
-      const width = "videoWidth" in source ? source.videoWidth : (source as HTMLCanvasElement).width;
-      const height = "videoHeight" in source ? source.videoHeight : (source as HTMLCanvasElement).height;
+      // An <img> on the page reports its laid-out size as width/height; the
+      // landmarks are fractions of its pixel size, which is naturalWidth.
+      const width =
+        "videoWidth" in source
+          ? source.videoWidth
+          : "naturalWidth" in source
+            ? source.naturalWidth
+            : (source as HTMLCanvasElement).width;
+      const height =
+        "videoHeight" in source
+          ? source.videoHeight
+          : "naturalHeight" in source
+            ? source.naturalHeight
+            : (source as HTMLCanvasElement).height;
 
       const monotonic = timestampMs > lastTimestamp ? timestampMs : lastTimestamp + 1;
       lastTimestamp = monotonic;

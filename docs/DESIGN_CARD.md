@@ -178,11 +178,12 @@ rather than a passing test.
 | **Served from** | this origin (`/models/`), never a CDN |
 
 **Data handling.** No image, frame, landmark or capture leaves the device. The
-browser build only ever requests files from its own origin: the page on load,
-then the model and its wasm runtime the first time the mirror or a photo needs
-them, and the sample portrait (`demo/model.jpg`, one image) only if the viewer
-asks for it. Nothing else is ever requested — type is set in system fonts and
-there is no analytics — so the claim is verifiable from the Network panel, or by
+browser build only ever requests files from its own origin: the page and its
+one font on load, then the sample portrait (`demo/model.jpg`, one image), the
+model and its wasm runtime, which the demo loads straight away unless the
+browser asks to save data or the connection is 2G-slow. Nothing else is ever
+requested — the font is served from this origin and there is no analytics — so
+the claim is verifiable from the Network panel, or by
 turning the network off once the mirror is running and carrying on. The Python
 engine touches the network exactly once,
 on first run, to fetch the model into `~/.cache/carmine/`; set `CARMINE_MODEL`
