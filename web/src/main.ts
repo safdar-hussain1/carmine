@@ -140,7 +140,7 @@ registerCheck("presets-valid", async () => {
 registerCheck("ui-mounts", async () => {
   const products = document.querySelectorAll(".product");
   if (products.length !== PRODUCTS.length) {
-    throw new Error(`expected ${PRODUCTS.length} products in the rail, found ${products.length}`);
+    throw new Error(`expected ${PRODUCTS.length} product panels, found ${products.length}`);
   }
   const presets = document.querySelectorAll(".preset");
   if (presets.length !== 4) {

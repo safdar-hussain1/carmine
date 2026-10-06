@@ -91,7 +91,7 @@ Nothing crosses between the surfaces at runtime. They meet only at build time
 | `lib/camera.ts` | getUserMedia lifecycle |
 | `ui/pipeline.ts` | shared landmarker, gloss percentiles, CPU still-render fallback |
 | `ui/scene.ts` | a still picture analysed once: landmarks, every mask, gloss percentiles |
-| `ui/mirror.ts`, `ui/rail.ts`, `ui/explainer.ts`, `ui/sections.ts` | the page: the mirror and its opening reveal, the look and product controls, the four steps drawn live, the markup |
+| `ui/mirror.ts`, `ui/controls.ts`, `ui/story.ts`, `ui/sections.ts` | the page: the mirror and its opening scan, the dock and the drawer of every product, how it works told as you scroll, the markup |
 | `ui/tween.ts`, `ui/geometry.ts`, `ui/facts.ts`, `ui/shades.ts` | blending between looks, the cover-crop mapping, the figures the page quotes, the shade catalogue |
 
 ---

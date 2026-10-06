@@ -285,7 +285,7 @@ python scripts/make_og_image.py                  # web/public/og-image.png, the 
 `verify_site.py` also takes `--timeout SECONDS` (default 120; 900 for
 `--with-parity` and `--timing-only`) and `--expect-checks N` (default 9; `0`
 turns the count check off). `build_notebook.py` takes `--kernel NAME` (default
-`python3`); `make_og_image.py` takes `--theme light|dark` and `--out PATH`.
+`python3`); `make_og_image.py` takes `--out PATH`.
 
 **Why the built site needs a server.** `docs/index.html` loads its script as an
 ES module and its stylesheet with `crossorigin`, and fetches the sample portrait,
@@ -350,7 +350,7 @@ src/carmine/          the engine: landmarks, regions, masks, pigment, look, engi
                       plus baselines.py (failure modes) and metrics.py (scorers)
 web/index.html        the page template: head, search and link-preview metadata
 web/src/engine/       the browser port: masks, pigment, colour, blur, look, renderer
-web/src/ui/           the page: mirror, look and product controls, the four steps, pipeline
+web/src/ui/           the page: mirror, dock and product drawer, scroll story, pipeline
 web/src/lib/          landmarker, camera, selftest, parity and timing harnesses
 web/src/gen/          constants.json + test_vectors.json, generated from Python
 web/public/           bundled model and wasm, demo portraits, favicon, og-image,

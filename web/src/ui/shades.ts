@@ -18,7 +18,7 @@ export interface Shade {
 
 export interface ProductMeta {
   name: ProductName;
-  /** Display name in the rail. */
+  /** Display name on the product's tab. */
   label: string;
   /** One line describing what the product does to the frame. */
   blurb: string;
@@ -129,7 +129,7 @@ const HIGHLIGHTER: Shade[] = [
 ];
 
 /**
- * Rail order -- what people reach for first, not the order the shader
+ * Tab order -- what people reach for first, not the order the shader
  * paints in (`PRODUCT_ORDER`). Lips lead because lipstick is the shade
  * anyone tries first.
  */

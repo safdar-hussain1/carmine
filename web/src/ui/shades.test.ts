@@ -5,7 +5,7 @@ import constants from "../gen/constants.json";
 import type { ProductName } from "../engine/look";
 
 /**
- * The rail can only show a preset as landing on a named shade if that
+ * The controls can only show a preset as landing on a named shade if that
  * shade's hex actually lives in the product's ramp -- otherwise tapping a
  * preset selects a colour the swatch row has no swatch for. These tests
  * guard the two ways that promise breaks: a preset colour drifting out of

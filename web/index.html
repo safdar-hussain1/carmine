@@ -13,7 +13,8 @@
     <meta name="google-site-verification" content="0SIEfExLTSQj1qvnHWF5A5fY58KVl2lpIEnePP9CtI0" />
     <link rel="canonical" href="https://safdar-hussain1.github.io/carmine/" />
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <meta name="color-scheme" content="light dark" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0b0608" />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Safdar Hussain" />
@@ -85,19 +86,6 @@
             }
           }
         ]
-      }
-    </script>
-    <script>
-      // Applied before the first paint: reading the stored theme from a
-      // module would be one load too late and would flash the wrong ground
-      // colour. Kept in sync with ui/theme.ts's THEME_KEY.
-      try {
-        var carmineTheme = localStorage.getItem("carmine.theme");
-        if (carmineTheme === "light" || carmineTheme === "dark") {
-          document.documentElement.dataset.theme = carmineTheme;
-        }
-      } catch (error) {
-        /* private browsing: fall back to the system theme */
       }
     </script>
   </head>

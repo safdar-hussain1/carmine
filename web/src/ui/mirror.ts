@@ -25,11 +25,12 @@
  * the result. Anyone who asks for reduced motion gets the result directly.
  */
 
+import { FaceLandmarker } from "@mediapipe/tasks-vision";
 import { loadPhoto, startCamera, stopCamera } from "../lib/camera";
 import { createRenderer, type Renderer } from "../engine/renderer";
 import { OneEuroFilter } from "../engine/oneEuro";
 import { hexToRgb } from "../engine/color";
-import { PRODUCT_ORDER, type LookConfig } from "../engine/look";
+import { PRODUCT_ORDER, type LookConfig, type ProductName } from "../engine/look";
 import { PROC_MAX_SIDE_LIVE, type MaskSet } from "../engine/masks";
 import {
   applyLookCpu,
@@ -48,15 +49,16 @@ import { easeInOut, mixLook, withoutMakeup } from "./tween";
 import { FACTS } from "./facts";
 import { ICONS } from "./icons";
 
-/** Long side the drawing buffer is capped at, matching the camera request. */
-const MAX_OUTPUT_SIDE = 1280;
+/** Long side the drawing buffer is capped at: the photo cap in camera.ts,
+ * so the sample and an uploaded photo render at their own resolution. */
+const MAX_OUTPUT_SIDE = 1600;
 
 /** How long a change of look or shade takes to blend in. Long enough to see
  * the colour turn, short enough that the mirror never feels behind you. */
 const BLEND_MS = 420;
 
 /** The opening reveal, phase by phase. */
-const REVEAL_MS = { dots: 950, masks: 750, tint: 1250, wipe: 700 };
+const REVEAL_MS = { scan: 1500, masks: 800, tint: 1300, wipe: 750 };
 
 const EMPTY_MASKS: MaskSet = {
   quality: "exact",
@@ -69,20 +71,41 @@ const EMPTY_MASKS: MaskSet = {
 
 export type Source = "sample" | "camera" | "photo";
 
+/** Landmarks that sit in the middle of each product's part of the face. */
+const FEATURE_POINTS: Record<ProductName, number[]> = {
+  lipstick: [0, 17],
+  eyeshadow: [159, 386],
+  eyeliner: [159, 386],
+  brows: [105, 334],
+  blush: [50, 280],
+  highlighter: [116, 345],
+};
+
 type Tone = "busy" | "ready" | "live" | "warn";
 
 export interface Mirror {
-  element: HTMLElement;
+  /** The picture itself, sized by whatever it is placed in. */
+  stage: HTMLElement;
+  /** Its buttons -- back, compare, steady, save -- for the page to place. */
+  tools: HTMLElement;
   /** Put a look on the face; `animate` blends to it instead of cutting. */
   setLook(look: LookConfig, animate: boolean): void;
   /** Load the face model and run the sample portrait. */
   start(): void;
   useCamera(): void;
   choosePhoto(): void;
+  /**
+   * Where a product's part of the face is on screen right now, in pixels
+   * from the top of the stage, or null when no face has been found yet.
+   */
+  featureY(product: ProductName): number | null;
 }
 
 interface MirrorOptions {
   look: LookConfig;
+  /** The sample already on the page, adopted so it neither reloads nor
+   * replays its entrance when the script takes over. */
+  poster?: HTMLImageElement | null;
   /** Start on the sample as soon as the page is up, without a click. */
   autostart: boolean;
   /** Called once, when the sample has been analysed. */
@@ -129,8 +152,6 @@ function prefersReducedMotion(): boolean {
 export function createMirror(options: MirrorOptions): Mirror {
   // ---- markup ------------------------------------------------------------
 
-  const root = el("div", "mirror");
-  const stageFrame = el("div", "stage-frame");
   const stage = el("div", "stage");
   stage.dataset.source = "sample";
   stage.dataset.phase = "idle";
@@ -141,12 +162,14 @@ export function createMirror(options: MirrorOptions): Mirror {
 
   // The sample is on screen from the first paint; the engine's own render
   // replaces it only once there is something to show.
-  const poster = el("img", "stage__poster");
-  poster.src = SAMPLE_PORTRAIT_URL;
-  poster.alt = "The sample portrait the demo runs on";
-  poster.width = 1600;
-  poster.height = 1067;
-  poster.decoding = "async";
+  const poster = options.poster ?? el("img", "stage__poster");
+  if (!options.poster) {
+    poster.src = SAMPLE_PORTRAIT_URL;
+    poster.alt = "The sample portrait the demo runs on";
+    poster.width = 1600;
+    poster.height = 1067;
+    poster.decoding = "async";
+  }
 
   const video = el("video", "stage__video");
   video.playsInline = true;
@@ -180,10 +203,20 @@ export function createMirror(options: MirrorOptions): Mirror {
   const startBtn = button("btn btn--primary stage__start", "Start the live demo", ICONS.play);
   startBtn.hidden = true;
 
-  stage.append(poster, video, canvas, overlay, wipe, status, notice, startBtn);
-  stageFrame.append(stage);
+  const fileInput = el("input", "visually-hidden");
+  fileInput.type = "file";
+  fileInput.accept = "image/*";
+  fileInput.tabIndex = -1;
+  fileInput.setAttribute("aria-hidden", "true");
 
-  const bar = el("div", "mirror__bar");
+  // Controls that only mean something for one source -- back to the sample,
+  // smoothing for the camera -- sit on the picture beside its status, where
+  // they appear when they apply; the always-useful ones go to the page.
+  const context = el("div", "stage__context");
+
+  stage.append(poster, video, canvas, overlay, wipe, status, context, notice, startBtn, fileInput);
+
+  const bar = el("div", "tools");
   const backBtn = button("tool", "Back to the sample", ICONS.back);
   const compareBtn = button("tool", "Compare", ICONS.compare);
   compareBtn.setAttribute("aria-pressed", "false");
@@ -194,15 +227,8 @@ export function createMirror(options: MirrorOptions): Mirror {
   const saveBtn = button("tool", "Save photo", ICONS.download);
   saveBtn.title = "Download what the mirror shows as a PNG";
   saveBtn.disabled = true;
-  bar.append(backBtn, compareBtn, steadyBtn, saveBtn);
-
-  const fileInput = el("input", "visually-hidden");
-  fileInput.type = "file";
-  fileInput.accept = "image/*";
-  fileInput.tabIndex = -1;
-  fileInput.setAttribute("aria-hidden", "true");
-
-  root.append(stageFrame, bar, fileInput);
+  context.append(backBtn, steadyBtn);
+  bar.append(compareBtn, saveBtn);
 
   // ---- state -------------------------------------------------------------
 
@@ -246,6 +272,8 @@ export function createMirror(options: MirrorOptions): Mirror {
   let drawHandle = 0;
   let revealing = false;
   let revealToken = 0;
+  /** The camera's most recent landmarks, for `featureY`. */
+  let liveLandmarks: Float32Array | null = null;
   const procCanvas = document.createElement("canvas");
 
   function ensureRenderer(): Renderer | null {
@@ -389,12 +417,23 @@ export function createMirror(options: MirrorOptions): Mirror {
     }
   }
 
+  /**
+   * The lowest the handle may go. On the wide layout the left of the picture
+   * fades out under the text column, where the handle could neither be seen
+   * nor grabbed again; everywhere else it has the whole width.
+   */
+  const wideLayout = window.matchMedia?.("(min-width: 75rem)");
+  function splitMin(): number {
+    return wideLayout?.matches ? 0.3 : 0;
+  }
+
   function positionWipe(): void {
+    splitPos = Math.max(splitPos, splitMin());
     const pct = `${splitPos * 100}%`;
     wipe.style.setProperty("--split", pct);
     wipe.setAttribute("aria-valuenow", String(Math.round(splitPos * 100)));
     // A label with no room beside the line would hang off the stage.
-    wipe.dataset.edge = splitPos < 0.2 ? "left" : splitPos > 0.8 ? "right" : "";
+    wipe.dataset.edge = splitPos < splitMin() + 0.2 ? "left" : splitPos > 0.8 ? "right" : "";
   }
 
   function applyCompare(on: boolean): void {
@@ -537,6 +576,7 @@ export function createMirror(options: MirrorOptions): Mirror {
     sizeCanvas(width, height);
 
     let landmarks = landmarker.detect(video, timestampMs);
+    liveLandmarks = landmarks;
     if (landmarks === null) {
       filter.reset();
       active.render(video, EMPTY_MASKS, look, {}, { mirror: true, splitX: splitPixels() });
@@ -904,7 +944,7 @@ export function createMirror(options: MirrorOptions): Mirror {
     const art = revealArt(scene);
 
     setStatus(`Found the face: ${FACTS.landmarks} points`, "ready");
-    if (!(await animate(REVEAL_MS.dots, (t) => art.draw(t, 1, 0), token))) {
+    if (!(await animate(REVEAL_MS.scan, (t) => art.draw(t, 1, 0), token))) {
       return;
     }
     setStatus("Drawing a soft mask for each product", "ready");
@@ -966,8 +1006,8 @@ export function createMirror(options: MirrorOptions): Mirror {
   }
 
   /**
-   * The reveal's drawing: the landmark points rippling out from the middle
-   * of the face, and every mask the look will paint, each in its own shade.
+   * The reveal's drawing: the landmark mesh rippling out from the middle of
+   * the face, and every mask the look will paint, each in its own shade.
    * Both are placed with the same cover fit the canvas is drawn with, so
    * they sit exactly on the features they belong to.
    */
@@ -984,15 +1024,27 @@ export function createMirror(options: MirrorOptions): Mirror {
     const toBuffer = canvas.width / scene.width;
     const fit = fitNow();
 
-    const BUCKETS = 12;
+    const BUCKETS = 16;
     const buckets: number[][] = Array.from({ length: BUCKETS }, () => []);
+    const edges: number[][] = Array.from({ length: BUCKETS }, () => []);
     const reach = Math.hypot(scene.face.width, scene.face.height) / 2 || 1;
+    const onStage = new Float32Array(scene.landmarks.length);
     for (let i = 0; i + 1 < scene.landmarks.length; i += 2) {
       const x = scene.landmarks[i];
       const y = scene.landmarks[i + 1];
       const [bx, by] = contentToBox(fit, x * toBuffer, y * toBuffer);
+      onStage[i] = bx * dpr;
+      onStage[i + 1] = by * dpr;
       const distance = Math.min(Math.hypot(x - scene.face.cx, y - scene.face.cy) / reach, 0.999);
       buckets[Math.floor(distance * BUCKETS)].push(bx * dpr, by * dpr);
+    }
+    // The mesh the landmarker fits, edge by edge, sorted into the same
+    // ripple so lines and points arrive together.
+    for (const edge of FaceLandmarker.FACE_LANDMARKS_TESSELATION) {
+      const mx = (scene.landmarks[edge.start * 2] + scene.landmarks[edge.end * 2]) / 2;
+      const my = (scene.landmarks[edge.start * 2 + 1] + scene.landmarks[edge.end * 2 + 1]) / 2;
+      const distance = Math.min(Math.hypot(mx - scene.face.cx, my - scene.face.cy) / reach, 0.999);
+      edges[Math.floor(distance * BUCKETS)].push(edge.start * 2, edge.end * 2);
     }
 
     const { masks } = scene;
@@ -1026,7 +1078,7 @@ export function createMirror(options: MirrorOptions): Mirror {
       maskCtx.putImageData(image, 0, 0);
     }
     const maskScale = (toBuffer / masks.scale) * fit.scale * dpr;
-    const radius = 1.45 * dpr;
+    const radius = 1.2 * dpr;
 
     return {
       draw(appear, dots, maskAlpha) {
@@ -1043,24 +1095,28 @@ export function createMirror(options: MirrorOptions): Mirror {
           );
         }
         if (dots > 0) {
+          // Lit like a scan: the mesh adds light to the picture under it.
+          ctx.globalCompositeOperation = "lighter";
+          ctx.lineWidth = 0.75 * dpr;
+          ctx.strokeStyle = "#f0d3ae";
           for (let b = 0; b < BUCKETS; b++) {
-            const local = Math.min(Math.max((appear - (b / BUCKETS) * 0.65) / 0.35, 0), 1);
+            const local = Math.min(Math.max((appear - (b / BUCKETS) * 0.6) / 0.4, 0), 1);
             const alpha = local * dots;
             if (alpha <= 0) {
               continue;
             }
-            const points = buckets[b];
-            const r = radius * (0.5 + 0.5 * local);
-            ctx.globalAlpha = alpha * 0.45;
-            ctx.fillStyle = "#1a0d10";
+            const list = edges[b];
+            ctx.globalAlpha = alpha * 0.42;
             ctx.beginPath();
-            for (let i = 0; i < points.length; i += 2) {
-              ctx.moveTo(points[i] + r + dpr, points[i + 1]);
-              ctx.arc(points[i], points[i + 1], r + dpr, 0, Math.PI * 2);
+            for (let i = 0; i < list.length; i += 2) {
+              ctx.moveTo(onStage[list[i]], onStage[list[i] + 1]);
+              ctx.lineTo(onStage[list[i + 1]], onStage[list[i + 1] + 1]);
             }
-            ctx.fill();
+            ctx.stroke();
+            const points = buckets[b];
+            const r = radius * (0.6 + 0.4 * local);
             ctx.globalAlpha = alpha;
-            ctx.fillStyle = "#ffffff";
+            ctx.fillStyle = "#fff6ec";
             ctx.beginPath();
             for (let i = 0; i < points.length; i += 2) {
               ctx.moveTo(points[i] + r, points[i + 1]);
@@ -1068,6 +1124,7 @@ export function createMirror(options: MirrorOptions): Mirror {
             }
             ctx.fill();
           }
+          ctx.globalCompositeOperation = "source-over";
         }
         ctx.globalAlpha = 1;
       },
@@ -1178,7 +1235,7 @@ export function createMirror(options: MirrorOptions): Mirror {
     } else if (event.key === "ArrowRight") {
       next += step;
     } else if (event.key === "Home") {
-      next = 0;
+      next = splitMin();
     } else if (event.key === "End") {
       next = 1;
     } else {
@@ -1214,7 +1271,8 @@ export function createMirror(options: MirrorOptions): Mirror {
   }
 
   return {
-    element: root,
+    stage,
+    tools: bar,
     setLook(next, animate) {
       cancelReveal();
       applyLook(next, animate);
@@ -1222,5 +1280,20 @@ export function createMirror(options: MirrorOptions): Mirror {
     start: () => void start(),
     useCamera: () => void useCamera(),
     choosePhoto,
+    featureY(product) {
+      const scene = currentScene();
+      const landmarks = source === "camera" ? liveLandmarks : (scene?.landmarks ?? null);
+      const contentHeight = source === "camera" ? video.videoHeight : (scene?.height ?? 0);
+      if (!landmarks || contentHeight <= 0 || canvas.height <= 0) {
+        return null;
+      }
+      let sum = 0;
+      for (const index of FEATURE_POINTS[product]) {
+        sum += landmarks[index * 2 + 1];
+      }
+      const y = sum / FEATURE_POINTS[product].length;
+      const toBuffer = canvas.height / contentHeight;
+      return contentToBox(fitNow(), 0, y * toBuffer)[1];
+    },
   };
 }

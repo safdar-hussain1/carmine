@@ -1,11 +1,11 @@
 /**
  * Inline SVG icons, drawn on a 24-unit grid with `currentColor` strokes so
- * they inherit the theme. Small enough to keep here rather than ship an
- * icon font: a font file would be one more download for a handful of
- * glyphs, and these stay sharp at any size.
+ * they take the colour of whatever they sit in. Small enough to keep here
+ * rather than ship an icon font: a font file would be one more download for
+ * a handful of glyphs, and these stay sharp at any size.
  */
 
-const stroke = 'fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"';
+const stroke = 'fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"';
 
 function svg(body: string): string {
   return `<svg viewBox="0 0 24 24" aria-hidden="true" ${stroke}>${body}</svg>`;
@@ -19,8 +19,8 @@ export const ICONS = {
   back: svg('<path d="M9.5 6.5 4 12l5.5 5.5"/><path d="M4.5 12H15a5 5 0 0 1 0 10h-1"/>'),
   steady: svg('<path d="M3 12c2.5-4 5.5-4 9 0s6.5 4 9 0"/><path d="M3 17c2.5-2 5.5-2 9 0s6.5 2 9 0" opacity=".45"/>'),
   play: svg('<path d="M8 5.5v13l10.5-6.5Z"/>'),
-  sun: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.2 5.2l1.4 1.4M17.4 17.4l1.4 1.4M18.8 5.2l-1.4 1.4M6.6 17.4l-1.4 1.4"/>'),
-  moon: svg('<path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a8.5 8.5 0 1 0 10.2 10.2Z"/>'),
+  sliders: svg('<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>'),
+  close: svg('<path d="M6 6l12 12M18 6 6 18"/>'),
   grip: svg('<path d="M9.5 8 6 12l3.5 4"/><path d="m14.5 8 3.5 4-3.5 4"/>'),
   device: svg('<rect x="4" y="5" width="16" height="11" rx="1.6"/><path d="M2.5 19h19"/><path d="M9.5 10.5l1.8 1.8 3.4-3.6"/>'),
   noUpload: svg('<path d="M12 15V5m0 0-3.5 3.5M12 5l3.5 3.5"/><path d="M5 19h14"/><path d="M4 4l16 16"/>'),

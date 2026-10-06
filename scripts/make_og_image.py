@@ -2,9 +2,15 @@
 
 LinkedIn, Slack, WhatsApp and X show this image in a link preview, so it is a
 real screenshot of the page rather than a drawn card: the built site (docs/)
-is served locally and opened in headless Chrome at 1200x630, the demo runs
+is served locally and opened in headless Chrome at 1600x840, the demo runs
 the sample portrait by itself, and once its opening sequence has settled on
 the before/after split the velvet look is picked and the viewport captured.
+
+1600x840 has the 1200x630 shape the previews want but enough height for
+the hero's whole composition; the capture is scaled down to 1200x630. The
+full-bleed photograph does not fit the 500 KB limit as a lossless PNG, so
+when it is over, it is reduced to a 256-colour palette with dithering,
+which keeps the face and the lipstick smooth at preview size.
 
 A screenshot goes stale when the page changes, which is why this is a script.
 It captures docs/, and the image reaches docs/ through web/public/ on the
@@ -12,13 +18,15 @@ next build, so run it between two builds:
 
     (cd web && npm run build) && python scripts/make_og_image.py && (cd web && npm run build)
 
-Needs Chrome or Chromium; no Python packages beyond the standard library.
+Needs Chrome or Chromium, and Pillow, which the dev extra installs (through
+scikit-image).
 """
 
 from __future__ import annotations
 
 import argparse
 import base64
+import io
 import json
 import shutil
 import struct
@@ -40,6 +48,7 @@ from verify_site import (
 
 OUT_PATH = REPO_ROOT / "web" / "public" / "og-image.png"
 WIDTH, HEIGHT = 1200, 630
+CAPTURE_WIDTH, CAPTURE_HEIGHT = 1600, 840
 MAX_BYTES = 500 * 1024
 
 # The status line the mirror settles on once the sample is drawn and the
@@ -96,7 +105,7 @@ def png_size(data: bytes) -> tuple[int, int]:
     return struct.unpack(">II", data[16:24])
 
 
-def capture(theme: str, timeout: float) -> bytes:
+def capture(timeout: float) -> bytes:
     server = _serve_docs(DOCS_DIR, _free_port(), None)
     devtools_port = _free_port()
     profile = tempfile.mkdtemp(prefix="carmine-og-")
@@ -128,14 +137,10 @@ def capture(theme: str, timeout: float) -> bytes:
         page = _Page(tab["webSocketDebuggerUrl"])
         page.call(
             "Emulation.setDeviceMetricsOverride",
-            width=WIDTH,
-            height=HEIGHT,
+            width=CAPTURE_WIDTH,
+            height=CAPTURE_HEIGHT,
             deviceScaleFactor=1,
             mobile=False,
-        )
-        page.call(
-            "Emulation.setEmulatedMedia",
-            features=[{"name": "prefers-color-scheme", "value": theme}],
         )
         page.call("Page.navigate", url=f"http://127.0.0.1:{server.server_address[1]}/index.html")
         page.wait_for(
@@ -144,6 +149,12 @@ def capture(theme: str, timeout: float) -> bytes:
             "the mirror to mount",
         )
         page.wait_for(SAMPLE_READY, timeout, "the sample portrait to render")
+        # The page's film grain is noise on purpose, and noise is the one
+        # thing a PNG cannot compress: the preview is taken without it.
+        page.evaluate(
+            "document.head.append(Object.assign(document.createElement('style'),"
+            " {textContent: 'body::after { display: none !important; }'}))"
+        )
         # Picking a look blends into it; give the blend time to finish.
         page.evaluate(CLICK_PRESET.format(label="Velvet"))
         time.sleep(1.5)
@@ -163,17 +174,34 @@ def capture(theme: str, timeout: float) -> bytes:
         shutil.rmtree(profile, ignore_errors=True)
 
 
+def to_preview(capture_png: bytes) -> bytes:
+    """Scales the capture to 1200x630 and fits it under the size limit."""
+    from PIL import Image
+
+    image = Image.open(io.BytesIO(capture_png)).convert("RGB")
+    image = image.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
+    out = io.BytesIO()
+    image.save(out, format="PNG", optimize=True)
+    if out.tell() <= MAX_BYTES:
+        return out.getvalue()
+    palette = image.quantize(
+        colors=256, method=Image.Quantize.FASTOCTREE, kmeans=2, dither=Image.Dither.FLOYDSTEINBERG
+    )
+    out = io.BytesIO()
+    palette.save(out, format="PNG", optimize=True)
+    return out.getvalue()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--out", type=Path, default=OUT_PATH, help="where to write the PNG")
-    parser.add_argument("--theme", choices=("light", "dark"), default="light")
     parser.add_argument("--timeout", type=float, default=120.0, help="seconds per wait")
     args = parser.parse_args()
 
     if not (DOCS_DIR / "index.html").exists():
         print(f"{DOCS_DIR} has no index.html; run the web build first", file=sys.stderr)
         return 1
-    data = capture(args.theme, args.timeout)
+    data = to_preview(capture(args.timeout))
     size = png_size(data)
     if size != (WIDTH, HEIGHT):
         print(f"captured {size[0]}x{size[1]}, expected {WIDTH}x{HEIGHT}", file=sys.stderr)
@@ -183,7 +211,7 @@ def main() -> int:
         return 1
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_bytes(data)
-    print(f"wrote {args.out} ({size[0]}x{size[1]}, {len(data) // 1024} KB, {args.theme} theme)")
+    print(f"wrote {args.out} ({size[0]}x{size[1]}, {len(data) // 1024} KB)")
     return 0
 
 

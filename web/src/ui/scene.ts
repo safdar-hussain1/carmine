@@ -6,8 +6,8 @@
  * product, and the gloss percentiles. After that, changing a shade costs one
  * draw instead of a detection, six mask rasters and a percentile sort, which
  * is what lets the mirror blend smoothly from one look to the next on a
- * photo, and what lets the explainer draw each step without detecting the
- * face again.
+ * photo, and what lets the how-it-works story draw each step without
+ * detecting the face again.
  *
  * Masks are the live construction, the same ones the mirror paints photos
  * with whenever WebGL2 is available. Gloss percentiles are measured on the

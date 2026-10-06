@@ -13,7 +13,8 @@
     <meta name="google-site-verification" content="0SIEfExLTSQj1qvnHWF5A5fY58KVl2lpIEnePP9CtI0" />
     <link rel="canonical" href="https://safdar-hussain1.github.io/carmine/" />
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <meta name="color-scheme" content="light dark" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0b0608" />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Safdar Hussain" />
@@ -87,177 +88,144 @@
         ]
       }
     </script>
-    <script>
-      // Applied before the first paint: reading the stored theme from a
-      // module would be one load too late and would flash the wrong ground
-      // colour. Kept in sync with ui/theme.ts's THEME_KEY.
-      try {
-        var carmineTheme = localStorage.getItem("carmine.theme");
-        if (carmineTheme === "light" || carmineTheme === "dark") {
-          document.documentElement.dataset.theme = carmineTheme;
-        }
-      } catch (error) {
-        /* private browsing: fall back to the system theme */
-      }
-    </script>
-    <script type="module" crossorigin src="./assets/index-CFr9LVX9.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-EY-FyA7m.css">
+    <script type="module" crossorigin src="./assets/index-C_AlSp5U.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DSiptzKi.css">
   </head>
   <body>
     <div id="app">
   
   <header class="site-header">
-    <div class="wrap site-header__inner">
+    <div class="site-header__inner">
       <a class="wordmark" href="#top" aria-label="Carmine, back to the top"><span class="wordmark__dot" aria-hidden="true"></span>Carmine</a>
       <nav class="site-nav" aria-label="Sections">
-        <a href="#demo">Demo</a>
+        <a href="#demo">Try it</a>
         <a href="#how">How it works</a>
         <a href="#privacy">Privacy</a>
       </nav>
-      <div class="site-header__actions">
-        <a class="icon-link" href="https://github.com/safdar-hussain1/carmine" rel="noopener" aria-label="Source code on GitHub"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.71 1.26 3.37.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.38-5.25 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg></a>
-        <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Switch theme"
-          ><span class="theme-toggle__sun"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.2 5.2l1.4 1.4M17.4 17.4l1.4 1.4M18.8 5.2l-1.4 1.4M6.6 17.4l-1.4 1.4"/></svg></span><span class="theme-toggle__moon"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a8.5 8.5 0 1 0 10.2 10.2Z"/></svg></span></button
-        >
-      </div>
+      <a class="icon-link" href="https://github.com/safdar-hussain1/carmine" rel="noopener" aria-label="Source code on GitHub"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.71 1.26 3.37.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.38-5.25 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg></a>
     </div>
   </header>
   <main id="top">
+    
     <section class="hero" id="demo" aria-label="Demo">
-      <div class="wrap hero__grid">
-        
-  <div class="intro">
-    <h1>Virtual makeup that keeps your skin’s texture.</h1>
-    <p class="lede">
-      Carmine paints lipstick, eyeshadow, liner, brows, blush and highlighter onto your face,
-      live, through your camera. It changes the colour but keeps your skin&rsquo;s own texture,
-      so it reads as makeup rather than a sticker. Everything runs in this tab; nothing is uploaded.
-    </p>
-  </div>
-        <div class="hero__studio">
-  <div class="mirror">
-    <div class="stage-frame">
-      <div class="stage" data-phase="idle" data-source="sample" data-drawn="false">
-        <img class="stage__poster" src="./demo/model.jpg" alt="The sample portrait the demo runs on" width="1600" height="1067" />
-      </div>
-    </div>
-    <div class="mirror__bar"></div>
+      <div class="hero__stage">
+  <div class="stage" data-phase="idle" data-source="sample" data-drawn="false">
+    <img class="stage__poster" src="./demo/model.jpg" alt="The sample portrait the demo runs on" width="1600" height="1067" />
   </div></div>
-        
-  <div class="cta">
-    <div class="cta__buttons">
-      <button class="btn btn--primary btn--large" type="button" data-action="camera"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A2 2 0 0 1 5 6.5h2l1.3-2h7.4L17 6.5h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><circle cx="12" cy="13" r="3.6"/></svg><span>Try it on your face</span></button>
-      <button class="btn btn--quiet btn--large" type="button" data-action="photo"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5"/></svg><span>Use a photo</span></button>
-    </div>
-    <p class="cta__note">Your browser asks before the camera turns on.</p>
-  </div>
-        <div class="hero__rail"><div class="rail rail--pending"></div></div>
+      <div class="hero__title">
+        <p class="masthead" aria-hidden="true">Carmine</p>
+        <h1>Virtual makeup that keeps your skin’s texture.</h1>
       </div>
+      <div class="hero__body">
+        <p class="lede">
+          Lipstick, eyeshadow, liner, brows, blush and highlighter, painted onto your face live
+          through your camera. The colour changes; the texture of your skin stays. It all runs in
+          this tab, and nothing is uploaded.
+        </p>
+        <div class="cta">
+          <button class="btn btn--primary" type="button" data-action="camera"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A2 2 0 0 1 5 6.5h2l1.3-2h7.4L17 6.5h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><circle cx="12" cy="13" r="3.6"/></svg><span>Try it on your face</span></button>
+          <button class="btn btn--glass" type="button" data-action="photo"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5"/></svg><span>Use a photo</span></button>
+        </div>
+        <p class="cta__note">Your browser asks before the camera turns on.</p>
+      </div>
+      <div class="hero__dock"><div class="dock dock--pending"></div></div>
     </section>
     
-  <section class="section how" id="how" aria-labelledby="how-title">
+  <section class="story" id="how" aria-labelledby="how-title">
     <div class="wrap">
-      <div class="section-head">
+      <div class="story__intro">
         <h2 id="how-title">How it works</h2>
         <p class="lede">
           The same four steps run on every camera frame, in the time between one frame and the next.
-          The pictures are drawn by the engine, live in your browser, from the sample photo above.
+          Every picture here is drawn by the engine, live in your browser, from the sample photo.
         </p>
       </div>
-      <ol class="film">
-      <li class="film__step" data-step="landmarks">
-        <div class="film__frame">
-          <canvas class="film__canvas" aria-hidden="true"></canvas>
-          
+      <div class="story__layout">
+        <div class="story__visual">
+          <div class="story__frame" data-active="landmarks">
+            <canvas class="story__canvas" data-step="landmarks" aria-hidden="true"></canvas><canvas class="story__canvas" data-step="masks" aria-hidden="true"></canvas><canvas class="story__canvas" data-step="texture" aria-hidden="true"></canvas><canvas class="story__canvas" data-step="final" aria-hidden="true"></canvas>
+            <span class="story__tag story__tag--left">Flat fill</span>
+            <span class="story__tag story__tag--right">Carmine</span>
+            <div class="story__progress" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+          </div>
         </div>
-        <h3 class="film__title"><span class="film__num">1</span>Find the face</h3>
-        <p class="film__body">A face landmark model finds 478 points on your face. Everything after this is placed from those points and scaled to the distance between your eyes.</p>
-        
-      </li>
-      <li class="film__step" data-step="masks">
-        <div class="film__frame">
-          <canvas class="film__canvas" aria-hidden="true"></canvas>
-          
-        </div>
-        <h3 class="film__title"><span class="film__num">2</span>Draw soft masks</h3>
-        <p class="film__body">Lips, lids, lash line, brows, cheeks and highlights each get a soft-edged shape. The edges soften in proportion to your face, so they stay soft as you lean in.</p>
-        
-      </li>
-      <li class="film__step" data-step="texture">
-        <div class="film__frame">
-          <canvas class="film__canvas" aria-hidden="true"></canvas>
-          <span class="film__tag film__tag--left">Flat fill</span><span class="film__tag film__tag--right">Carmine</span>
-        </div>
-        <h3 class="film__title"><span class="film__num">3</span>Change the colour, keep the texture</h3>
-        <p class="film__body">Colour is changed in CIELAB, where lightness is separate from hue. A flat fill paints over the lip; Carmine moves the colour and keeps the lip&rsquo;s own light and shadow.</p>
-        
-      <figure class="shift">
-        <figcaption>Average change in lip brightness over 26 portraits</figcaption>
-        <div class="shift__row">
-          <span class="shift__label">Flat fill</span>
-          <span class="shift__track"><span class="shift__bar" style="width:100.0%"></span></span>
-          <span class="shift__value">45.7</span>
-        </div>
-        <div class="shift__row shift__row--ours">
-          <span class="shift__label">Carmine</span>
-          <span class="shift__track"><span class="shift__bar" style="width:28.8%"></span></span>
-          <span class="shift__value">13.2</span>
-        </div>
-        <p class="shift__note">On the 0&ndash;255 lightness scale. Lower keeps more of the real lip.</p>
-      </figure>
-      </li>
-      <li class="film__step" data-step="final">
-        <div class="film__frame">
-          <canvas class="film__canvas" aria-hidden="true"></canvas>
-          
-        </div>
-        <h3 class="film__title"><span class="film__num">4</span>Paint it in one pass</h3>
-        <p class="film__body">All six products are drawn in a single pass on your graphics card. The whole pipeline takes 26.6 ms a frame on an Apple M1 Pro laptop, about 37.6 frames a second.</p>
-        
-      </li>
-      </ol>
-      <p class="how__more">
+        <ol class="story__steps">
+        <li class="chapter" data-step="landmarks">
+          <span class="chapter__num">01</span>
+          <h3 class="chapter__title">Find the face</h3>
+          <p class="chapter__body">A face landmark model finds 478 points on your face and joins them into a mesh. Everything after this is placed from those points and scaled to the distance between your eyes.</p>
+        </li>
+        <li class="chapter" data-step="masks">
+          <span class="chapter__num">02</span>
+          <h3 class="chapter__title">Draw soft masks</h3>
+          <p class="chapter__body">Lips, lids, lash line, brows, cheeks and highlights each get a soft-edged shape. The edges soften in proportion to your face, so they stay soft as you lean in.</p>
+        </li>
+        <li class="chapter" data-step="texture">
+          <span class="chapter__num">03</span>
+          <h3 class="chapter__title">Change the colour, keep the texture</h3>
+          <p class="chapter__body">Colour is changed in CIELAB, where lightness is separate from hue. A flat fill paints over the lip; Carmine moves the colour and keeps the lip’s own light and shadow. Drag across the picture to compare.</p>
+          <figure class="shift">
+            <figcaption>Average change in lip brightness over 26 portraits</figcaption>
+            <div class="shift__row">
+              <span class="shift__label">Flat fill</span>
+              <span class="shift__track"><span class="shift__bar" style="--w:100.0%"></span></span>
+              <span class="shift__value">45.7</span>
+            </div>
+            <div class="shift__row shift__row--ours">
+              <span class="shift__label">Carmine</span>
+              <span class="shift__track"><span class="shift__bar" style="--w:28.8%"></span></span>
+              <span class="shift__value">13.2</span>
+            </div>
+            <p class="shift__note">On the 0&ndash;255 lightness scale. Lower keeps more of the real lip.</p>
+          </figure>
+        </li>
+        <li class="chapter" data-step="final">
+          <span class="chapter__num">04</span>
+          <h3 class="chapter__title">Paint it in one pass</h3>
+          <p class="chapter__body">All six products are drawn in a single pass on your graphics card. The whole pipeline takes 26.6 ms a frame on an Apple M1 Pro laptop, about 37.6 frames a second.</p>
+        </li>
+        </ol>
+      </div>
+      <p class="story__more">
         The <a href="https://github.com/safdar-hussain1/carmine#measured" rel="noopener">full benchmark</a> compares Carmine with four
         common shortcuts on every measure, including the two it loses on.
       </p>
     </div>
   </section>
     
-  <section class="section privacy" id="privacy" aria-labelledby="privacy-title">
+  <section class="privacy" id="privacy" aria-labelledby="privacy-title">
     <div class="wrap">
-      <div class="privacy__panel">
-        <div class="section-head">
-          <h2 id="privacy-title">Your face never leaves this tab.</h2>
-          <p class="lede">
-            No server does the work. The page downloads its files from this site, and from then on
-            everything happens on your device.
-          </p>
-        </div>
-        <ul class="privacy__points">
-          <li>
-            <span class="privacy__icon"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="11" rx="1.6"/><path d="M2.5 19h19"/><path d="M9.5 10.5l1.8 1.8 3.4-3.6"/></svg></span>
-            <h3>Runs on your device</h3>
-            <p>The face model and the colour maths run in your browser, on your own graphics card.</p>
-          </li>
-          <li>
-            <span class="privacy__icon"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V5m0 0-3.5 3.5M12 5l3.5 3.5"/><path d="M5 19h14"/><path d="M4 4l16 16"/></svg></span>
-            <h3>Nothing is uploaded</h3>
-            <p>Camera frames go to the screen and nowhere else. Save photo downloads a PNG to your device, and that is the only copy.</p>
-          </li>
-          <li>
-            <span class="privacy__icon"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9a14 14 0 0 1 4.6-2.8M10.4 5.6A14 14 0 0 1 21.5 9"/><path d="M5.5 12.5a9 9 0 0 1 3.6-2M15.6 11.2a9 9 0 0 1 2.9 1.3"/><path d="M9 16a4.5 4.5 0 0 1 6 0"/><circle cx="12" cy="19.2" r=".6" fill="currentColor"/><path d="M3.5 3.5l17 17"/></svg></span>
-            <h3>Check it yourself</h3>
-            <p>Once the mirror is running, turn off your Wi-Fi. It keeps working, because it no longer needs the network.</p>
-          </li>
-        </ul>
+      <div class="privacy__head">
+        <h2 id="privacy-title">Your face never leaves this tab.</h2>
+        <p class="lede">
+          No server does the work. The page downloads its files from this site, and from then on
+          everything happens on your device.
+        </p>
       </div>
+      <ul class="privacy__points">
+        <li>
+          <span class="privacy__icon"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="11" rx="1.6"/><path d="M2.5 19h19"/><path d="M9.5 10.5l1.8 1.8 3.4-3.6"/></svg></span>
+          <h3>Runs on your device</h3>
+          <p>The face model and the colour maths run in your browser, on your own graphics card.</p>
+        </li>
+        <li>
+          <span class="privacy__icon"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V5m0 0-3.5 3.5M12 5l3.5 3.5"/><path d="M5 19h14"/><path d="M4 4l16 16"/></svg></span>
+          <h3>Nothing is uploaded</h3>
+          <p>Camera frames go to the screen and nowhere else. Save photo downloads a PNG to your device, and that is the only copy.</p>
+        </li>
+        <li>
+          <span class="privacy__icon"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9a14 14 0 0 1 4.6-2.8M10.4 5.6A14 14 0 0 1 21.5 9"/><path d="M5.5 12.5a9 9 0 0 1 3.6-2M15.6 11.2a9 9 0 0 1 2.9 1.3"/><path d="M9 16a4.5 4.5 0 0 1 6 0"/><circle cx="12" cy="19.2" r=".6" fill="currentColor"/><path d="M3.5 3.5l17 17"/></svg></span>
+          <h3>Check it yourself</h3>
+          <p>Once the mirror is running, turn off your Wi-Fi. It keeps working, because it no longer needs the network.</p>
+        </li>
+      </ul>
     </div>
   </section>
   </main>
   
   <footer class="site-footer">
     <div class="wrap site-footer__inner">
-      <p class="site-footer__brand"><span class="wordmark__dot" aria-hidden="true"></span>Carmine</p>
+      <p class="site-footer__brand">Carmine</p>
       <nav class="site-footer__links" aria-label="Project">
         <a href="https://github.com/safdar-hussain1" rel="author">Built by Safdar Hussain</a>
         <a href="https://github.com/safdar-hussain1/carmine" rel="noopener">Source on GitHub</a>
@@ -267,6 +235,7 @@
       </nav>
       <p class="site-footer__credit">Sample portrait: photo by Andrea Piacquadio on Pexels</p>
     </div>
-  </footer></div>
+  </footer>
+  </div>
   </body>
 </html>
