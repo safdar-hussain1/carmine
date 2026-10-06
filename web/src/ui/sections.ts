@@ -26,6 +26,9 @@ export function headerHtml(): string {
         <a href="#privacy">Privacy</a>
       </nav>
       <a class="icon-link" href="${REPO_URL}" rel="noopener" aria-label="Source code on GitHub">${ICONS.github}</a>
+      <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Switch theme"
+        ><span class="theme-toggle__sun">${ICONS.sun}</span><span class="theme-toggle__moon">${ICONS.moon}</span></button
+      >
     </div>
   </header>`;
 }

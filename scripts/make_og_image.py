@@ -105,7 +105,7 @@ def png_size(data: bytes) -> tuple[int, int]:
     return struct.unpack(">II", data[16:24])
 
 
-def capture(timeout: float) -> bytes:
+def capture(theme: str, timeout: float) -> bytes:
     server = _serve_docs(DOCS_DIR, _free_port(), None)
     devtools_port = _free_port()
     profile = tempfile.mkdtemp(prefix="carmine-og-")
@@ -141,6 +141,12 @@ def capture(timeout: float) -> bytes:
             height=CAPTURE_HEIGHT,
             deviceScaleFactor=1,
             mobile=False,
+        )
+        # The page follows the device's light or dark setting; the preview
+        # is taken in the one asked for, the dark theme unless told otherwise.
+        page.call(
+            "Emulation.setEmulatedMedia",
+            features=[{"name": "prefers-color-scheme", "value": theme}],
         )
         page.call("Page.navigate", url=f"http://127.0.0.1:{server.server_address[1]}/index.html")
         page.wait_for(
@@ -195,13 +201,14 @@ def to_preview(capture_png: bytes) -> bytes:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--out", type=Path, default=OUT_PATH, help="where to write the PNG")
+    parser.add_argument("--theme", choices=("light", "dark"), default="dark")
     parser.add_argument("--timeout", type=float, default=120.0, help="seconds per wait")
     args = parser.parse_args()
 
     if not (DOCS_DIR / "index.html").exists():
         print(f"{DOCS_DIR} has no index.html; run the web build first", file=sys.stderr)
         return 1
-    data = to_preview(capture(args.timeout))
+    data = to_preview(capture(args.theme, args.timeout))
     size = png_size(data)
     if size != (WIDTH, HEIGHT):
         print(f"captured {size[0]}x{size[1]}, expected {WIDTH}x{HEIGHT}", file=sys.stderr)
@@ -211,7 +218,7 @@ def main() -> int:
         return 1
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_bytes(data)
-    print(f"wrote {args.out} ({size[0]}x{size[1]}, {len(data) // 1024} KB)")
+    print(f"wrote {args.out} ({size[0]}x{size[1]}, {len(data) // 1024} KB, {args.theme} theme)")
     return 0
 
 

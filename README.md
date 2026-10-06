@@ -285,7 +285,7 @@ python scripts/make_og_image.py                  # web/public/og-image.png, the 
 `verify_site.py` also takes `--timeout SECONDS` (default 120; 900 for
 `--with-parity` and `--timing-only`) and `--expect-checks N` (default 9; `0`
 turns the count check off). `build_notebook.py` takes `--kernel NAME` (default
-`python3`); `make_og_image.py` takes `--out PATH`.
+`python3`); `make_og_image.py` takes `--theme light|dark` (default dark) and `--out PATH`.
 
 **Why the built site needs a server.** `docs/index.html` loads its script as an
 ES module and its stylesheet with `crossorigin`, and fetches the sample portrait,

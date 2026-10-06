@@ -16,6 +16,7 @@ import { createControls, type Change } from "./controls";
 import { createMirror } from "./mirror";
 import { shellHtml } from "./sections";
 import { createStory } from "./story";
+import { initTheme } from "./theme";
 
 /** The look the page opens on. Everyday is the one that reads as makeup
  * rather than as a demo of makeup. */
@@ -149,6 +150,11 @@ export function mountApp(root: HTMLElement): void {
   };
   window.addEventListener("scroll", onScroll, { passive: true });
   onScroll();
+
+  const themeToggle = root.querySelector<HTMLButtonElement>("#theme-toggle");
+  if (themeToggle) {
+    initTheme(themeToggle);
+  }
 
   setAccent(look);
 }

@@ -48,19 +48,41 @@
 :root {
   color-scheme: dark;
 
-  --night: #0b0608;
-  --night-2: #130a0e;
-  --night-3: #1b1014;
-  --ivory: #f7ede8;
-  --smoke: #cdbbc0;
-  --ash: #a8949a;
-  --champagne: #ebcca7;
-  --champagne-soft: rgb(235 204 167 / 0.38);
+  --ground: #0b0608;
+  --ground-2: #130a0e;
+  --ground-3: #1b1014;
+  --ink: #f7ede8;
+  --ink-2: #cdbbc0;
+  --ink-3: #a8949a;
+  --metal: #ebcca7;
+  --metal-soft: rgb(235 204 167 / 0.38);
   --glass: rgb(255 238 234 / 0.06);
   --glass-2: rgb(255 238 234 / 0.11);
   --line: rgb(255 238 234 / 0.12);
   --line-2: rgb(255 238 234 / 0.22);
-  --ink-on-ivory: #1d0e12;
+  --pill: #f7ede8;
+  --pill-ink: #1d0e12;
+  /* Type and rings that sit on the photograph keep their own colours in
+     both themes: the picture is the same picture whatever the page is. */
+  --on-photo: #f7ede8;
+  --metal-on-photo: #ebcca7;
+  --btn-top: #fffaf6;
+  --btn-bottom: #efe0d6;
+  --btn-ink: #1d0e12;
+  --btn-rim: rgb(255 255 255 / 0.8);
+  --dock-top: rgb(255 238 234 / 0.085);
+  --dock-bottom: rgb(255 238 234 / 0.03);
+  --dock-rim: rgb(255 255 255 / 0.07);
+  --sheet: rgb(17 9 12 / 0.9);
+  --card: rgb(19 10 14 / 0.92);
+  --well: rgb(255 238 234 / 0.05);
+  --well-2: rgb(255 238 234 / 0.08);
+  --track: rgb(255 238 234 / 0.14);
+  --header-scrolled: rgb(11 6 8 / 0.72);
+  --glow-2: rgb(88 20 44 / 0.4);
+  --shadow: rgb(0 0 0 / 0.88);
+  --grain: 0.055;
+  --masthead-glow: 45%;
 
   --shade: #b03a5b;
 
@@ -76,6 +98,84 @@
   transition: --shade 900ms var(--ease);
 }
 
+/*
+ * Daylight: the same page with the lights up. Porcelain ground, plum-black
+ * type, bronze where the dark theme uses champagne, and the face fading into
+ * soft light instead of shadow. It follows the device's setting unless the
+ * reader picks one with the switch in the masthead.
+ */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --ground: #f7f1ee;
+    --ground-2: #efe6e2;
+    --ground-3: #e7dbd6;
+    --ink: #24161a;
+    --ink-2: #574549;
+    --ink-3: #6f5c61;
+    --metal: #8a5a2e;
+    --metal-soft: rgb(138 90 46 / 0.35);
+    --glass: rgb(255 255 255 / 0.55);
+    --glass-2: rgb(255 255 255 / 0.85);
+    --line: rgb(36 22 26 / 0.12);
+    --line-2: rgb(36 22 26 / 0.2);
+    --pill: #24161a;
+    --pill-ink: #fbf5f2;
+    --btn-top: #3a2228;
+    --btn-bottom: #1f1014;
+    --btn-ink: #fbf5f2;
+    --btn-rim: rgb(255 255 255 / 0.14);
+    --dock-top: rgb(255 255 255 / 0.82);
+    --dock-bottom: rgb(255 255 255 / 0.58);
+    --dock-rim: rgb(255 255 255 / 0.9);
+    --sheet: rgb(250 245 242 / 0.94);
+    --card: rgb(252 248 246 / 0.97);
+    --well: rgb(36 22 26 / 0.05);
+    --well-2: rgb(36 22 26 / 0.08);
+    --track: rgb(36 22 26 / 0.14);
+    --header-scrolled: rgb(247 241 238 / 0.8);
+    --glow-2: rgb(232 176 186 / 0.35);
+    --shadow: rgb(70 35 45 / 0.3);
+    --grain: 0.03;
+    --masthead-glow: 24%;
+  }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --ground: #f7f1ee;
+  --ground-2: #efe6e2;
+  --ground-3: #e7dbd6;
+  --ink: #24161a;
+  --ink-2: #574549;
+  --ink-3: #6f5c61;
+  --metal: #8a5a2e;
+  --metal-soft: rgb(138 90 46 / 0.35);
+  --glass: rgb(255 255 255 / 0.55);
+  --glass-2: rgb(255 255 255 / 0.85);
+  --line: rgb(36 22 26 / 0.12);
+  --line-2: rgb(36 22 26 / 0.2);
+  --pill: #24161a;
+  --pill-ink: #fbf5f2;
+  --btn-top: #3a2228;
+  --btn-bottom: #1f1014;
+  --btn-ink: #fbf5f2;
+  --btn-rim: rgb(255 255 255 / 0.14);
+  --dock-top: rgb(255 255 255 / 0.82);
+  --dock-bottom: rgb(255 255 255 / 0.58);
+  --dock-rim: rgb(255 255 255 / 0.9);
+  --sheet: rgb(250 245 242 / 0.94);
+  --card: rgb(252 248 246 / 0.97);
+  --well: rgb(36 22 26 / 0.05);
+  --well-2: rgb(36 22 26 / 0.08);
+  --track: rgb(36 22 26 / 0.14);
+  --header-scrolled: rgb(247 241 238 / 0.8);
+  --glow-2: rgb(232 176 186 / 0.35);
+  --shadow: rgb(70 35 45 / 0.3);
+  --grain: 0.03;
+  --masthead-glow: 24%;
+}
+
 /* ---- base ------------------------------------------------------------- */
 
 *,
@@ -88,13 +188,13 @@ html {
   scroll-behavior: smooth;
   scroll-padding-top: var(--header-h);
   -webkit-text-size-adjust: 100%;
-  background: var(--night);
+  background: var(--ground);
 }
 
 body {
   margin: 0;
-  background: var(--night);
-  color: var(--ivory);
+  background: var(--ground);
+  color: var(--ink);
   font-family: var(--font-ui);
   font-size: 1rem;
   line-height: 1.6;
@@ -112,7 +212,7 @@ body::after {
   z-index: 90;
   pointer-events: none;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.6 0'/></filter><rect width='100%' height='100%' filter='url(%23g)'/></svg>");
-  opacity: 0.055;
+  opacity: var(--grain);
   mix-blend-mode: overlay;
   animation: grain 1.4s steps(6) infinite;
 }
@@ -165,11 +265,11 @@ button {
 
 ::selection {
   background: color-mix(in oklab, var(--shade) 45%, transparent);
-  color: var(--ivory);
+  color: var(--ink);
 }
 
 :focus-visible {
-  outline: 2px solid var(--champagne);
+  outline: 2px solid var(--metal);
   outline-offset: 3px;
 }
 
@@ -191,7 +291,7 @@ button {
 }
 
 .lede {
-  color: var(--smoke);
+  color: var(--ink-2);
   font-size: 1.0625rem;
   line-height: 1.7;
   max-width: 34rem;
@@ -235,16 +335,16 @@ button {
 }
 
 .btn--primary {
-  background: linear-gradient(180deg, #fffaf6, #efe0d6);
-  color: var(--ink-on-ivory);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.8),
+  background: linear-gradient(180deg, var(--btn-top), var(--btn-bottom));
+  color: var(--btn-ink);
+  box-shadow: inset 0 1px 0 var(--btn-rim),
     0 12px 32px -12px color-mix(in oklab, var(--shade) 75%, transparent),
     0 0 46px -14px color-mix(in oklab, var(--shade) 90%, transparent);
 }
 
 .btn--primary:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.8),
+  box-shadow: inset 0 1px 0 var(--btn-rim),
     0 18px 40px -14px color-mix(in oklab, var(--shade) 85%, transparent),
     0 0 60px -10px color-mix(in oklab, var(--shade) 95%, transparent);
 }
@@ -253,7 +353,7 @@ button {
 .btn--quiet {
   background: var(--glass);
   border-color: var(--line-2);
-  color: var(--ivory);
+  color: var(--ink);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
 }
@@ -261,11 +361,11 @@ button {
 .btn--glass:hover:not(:disabled),
 .btn--quiet:hover:not(:disabled) {
   background: var(--glass-2);
-  border-color: var(--champagne-soft);
+  border-color: var(--metal-soft);
 }
 
 .btn[data-active="true"] {
-  border-color: var(--champagne);
+  border-color: var(--metal);
   box-shadow: 0 0 0 3px rgb(235 204 167 / 0.18);
 }
 
@@ -282,7 +382,7 @@ button {
 }
 
 .site-header.is-scrolled {
-  background: rgb(11 6 8 / 0.72);
+  background: var(--header-scrolled);
   -webkit-backdrop-filter: blur(18px) saturate(1.3);
   backdrop-filter: blur(18px) saturate(1.3);
   border-bottom-color: var(--line);
@@ -304,7 +404,7 @@ button {
   font-size: 1.4rem;
   font-weight: 600;
   letter-spacing: 0.01em;
-  color: var(--ivory);
+  color: var(--ink);
   text-decoration: none;
 }
 
@@ -325,7 +425,7 @@ button {
 
 .site-nav a {
   position: relative;
-  color: var(--smoke);
+  color: var(--ink-2);
   font-size: 0.9375rem;
   letter-spacing: 0.01em;
   text-decoration: none;
@@ -339,14 +439,14 @@ button {
   right: 0;
   bottom: -6px;
   height: 1px;
-  background: var(--champagne);
+  background: var(--metal);
   transform: scaleX(0);
   transform-origin: left;
   transition: transform 300ms var(--ease);
 }
 
 .site-nav a:hover {
-  color: var(--ivory);
+  color: var(--ink);
 }
 
 .site-nav a:hover::after {
@@ -362,18 +462,47 @@ button {
   border-radius: 50%;
   border: 1px solid var(--line-2);
   background: var(--glass);
-  color: var(--ivory);
+  color: var(--ink);
   transition: border-color 200ms var(--ease), background-color 200ms var(--ease);
 }
 
-.icon-link:hover {
-  border-color: var(--champagne-soft);
+.icon-link:hover,
+.theme-toggle:hover {
+  border-color: var(--metal-soft);
   background: var(--glass-2);
 }
 
-.icon-link svg {
+.icon-link svg,
+.theme-toggle svg {
   width: 18px;
   height: 18px;
+}
+
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid var(--line-2);
+  background: var(--glass);
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 200ms var(--ease), background-color 200ms var(--ease);
+}
+
+.theme-toggle__sun,
+.theme-toggle__moon {
+  display: grid;
+  place-items: center;
+}
+
+/* The switch shows where it would take you: the sun in the dark, the moon
+   in the light. */
+.theme-toggle[data-resolved="light"] .theme-toggle__sun,
+.theme-toggle[data-resolved="dark"] .theme-toggle__moon {
+  display: none;
 }
 
 @media (min-width: 48rem) {
@@ -415,7 +544,7 @@ button {
       color-mix(in oklab, var(--shade) 34%, transparent),
       transparent 72%
     ),
-    radial-gradient(45% 40% at 85% 85%, rgb(88 20 44 / 0.4), transparent 70%);
+    radial-gradient(45% 40% at 85% 85%, var(--glow-2), transparent 70%);
   filter: blur(30px);
   pointer-events: none;
 }
@@ -471,7 +600,7 @@ button {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 10px 34px color-mix(in oklab, var(--shade) 45%, transparent));
+  filter: drop-shadow(0 10px 34px color-mix(in oklab, var(--shade) var(--masthead-glow), transparent));
   transition: --sheen 2600ms cubic-bezier(0.45, 0, 0.2, 1);
   animation: rise 1100ms var(--ease) both;
   pointer-events: none;
@@ -524,7 +653,7 @@ button {
 
 .cta__note {
   margin-top: 0.85rem;
-  color: var(--ash);
+  color: var(--ink-3);
   font-size: 0.875rem;
 }
 
@@ -590,6 +719,12 @@ button {
 
   .hero__body .cta {
     margin-top: 1.4rem;
+  }
+
+  /* Kept clear of the picture's faded edge, which reads as texture behind
+     light type in the dark theme but as noise behind dark type in daylight. */
+  .hero__body .lede {
+    max-width: 30rem;
   }
 
   .hero__dock {
@@ -736,7 +871,7 @@ button {
   display: grid;
   place-items: center;
   background: rgb(11 6 8 / 0.7);
-  color: var(--ivory);
+  color: var(--on-photo);
   font-family: var(--font-display);
   font-size: 1.6rem;
 }
@@ -757,7 +892,7 @@ button {
   border: 1px solid var(--line);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
-  color: var(--ivory);
+  color: var(--on-photo);
   font-size: 0.8125rem;
   font-weight: 500;
   letter-spacing: 0.01em;
@@ -796,6 +931,8 @@ button {
 
 .stage__context .tool {
   background: rgb(11 6 8 / 0.6);
+  border-color: rgb(255 255 255 / 0.22);
+  color: var(--on-photo);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
 }
@@ -814,8 +951,8 @@ button {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--champagne);
-  box-shadow: 0 0 10px var(--champagne);
+  background: var(--metal);
+  box-shadow: 0 0 10px var(--metal);
   flex: none;
 }
 
@@ -872,11 +1009,12 @@ button {
   gap: 0.85rem;
   padding: 1.1rem 1.2rem;
   border-radius: 18px;
-  background: rgb(19 10 14 / 0.92);
+  background: var(--card);
+  color: var(--ink);
   border: 1px solid var(--line-2);
   -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
-  box-shadow: 0 30px 60px -30px rgb(0 0 0 / 0.9);
+  box-shadow: 0 30px 60px -30px var(--shadow);
 }
 
 @media (min-width: 75rem) {
@@ -915,7 +1053,7 @@ button {
   padding: 0.5rem 0.25rem;
   border: 0;
   background: none;
-  color: var(--smoke);
+  color: var(--ink-2);
   font-size: 0.875rem;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -976,10 +1114,10 @@ button {
   transform: translate(-50%, -50%);
   border-radius: 50%;
   background: rgb(11 6 8 / 0.55);
-  border: 1px solid var(--champagne);
+  border: 1px solid var(--metal-on-photo);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
-  color: var(--ivory);
+  color: var(--on-photo);
   box-shadow: 0 0 0 4px rgb(235 204 167 / 0.12), 0 12px 30px -8px rgb(0 0 0 / 0.7);
   transition: transform 200ms var(--ease);
 }
@@ -990,7 +1128,7 @@ button {
 }
 
 .wipe:focus-visible .wipe__grip {
-  outline: 2px solid var(--champagne);
+  outline: 2px solid var(--metal);
   outline-offset: 4px;
 }
 
@@ -1007,7 +1145,7 @@ button {
   background: rgb(11 6 8 / 0.55);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
-  color: var(--ivory);
+  color: var(--on-photo);
   font-size: 0.75rem;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -1054,11 +1192,11 @@ button {
   max-width: 34rem;
   padding: 1rem 1.15rem 0.95rem;
   border-radius: 24px;
-  background: linear-gradient(160deg, rgb(255 238 234 / 0.085), rgb(255 238 234 / 0.03));
+  background: linear-gradient(160deg, var(--dock-top), var(--dock-bottom));
   border: 1px solid var(--line);
   -webkit-backdrop-filter: blur(20px) saturate(1.25);
   backdrop-filter: blur(20px) saturate(1.25);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.07), 0 40px 80px -40px rgb(0 0 0 / 0.9);
+  box-shadow: inset 0 1px 0 var(--dock-rim), 0 40px 80px -40px var(--shadow);
 }
 
 /* Held at the dock's real height until the script fills it, so the column
@@ -1082,7 +1220,7 @@ button {
   display: flex;
   align-items: baseline;
   gap: 0.7rem;
-  color: var(--ash);
+  color: var(--ink-3);
   font-size: 0.8125rem;
   letter-spacing: 0.02em;
 }
@@ -1092,11 +1230,11 @@ button {
   font-size: 1.1rem;
   font-weight: 500;
   letter-spacing: 0;
-  color: var(--ivory);
+  color: var(--ink);
 }
 
 .dock__shade[data-preview="true"] {
-  color: var(--champagne);
+  color: var(--metal);
 }
 
 .presets {
@@ -1121,7 +1259,7 @@ button {
   border: 1px solid var(--line-2);
   border-radius: 999px;
   background: transparent;
-  color: var(--smoke);
+  color: var(--ink-2);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
@@ -1130,8 +1268,8 @@ button {
 }
 
 .preset:hover {
-  color: var(--ivory);
-  border-color: var(--champagne-soft);
+  color: var(--ink);
+  border-color: var(--metal-soft);
 }
 
 .preset:active {
@@ -1139,9 +1277,9 @@ button {
 }
 
 .preset[aria-pressed="true"] {
-  background: var(--ivory);
-  border-color: var(--ivory);
-  color: var(--ink-on-ivory);
+  background: var(--pill);
+  border-color: var(--pill);
+  color: var(--pill-ink);
   box-shadow: 0 8px 24px -10px color-mix(in oklab, var(--shade) 85%, transparent);
 }
 
@@ -1156,7 +1294,7 @@ button {
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, rgb(255 255 255 / 0.45), transparent 55%),
     var(--pan);
-  box-shadow: 0 0 0 1.5px var(--night-2);
+  box-shadow: 0 0 0 1.5px var(--ground-2);
 }
 
 .preset__pans span:nth-child(n + 4) {
@@ -1164,7 +1302,7 @@ button {
 }
 
 .preset[aria-pressed="true"] .preset__pans span {
-  box-shadow: 0 0 0 1.5px var(--ivory);
+  box-shadow: 0 0 0 1.5px var(--pill);
 }
 
 /* Lipstick bullets: a slanted wax tip over a gold collar and black case,
@@ -1255,8 +1393,8 @@ button {
   height: 5px;
   border-radius: 50%;
   transform: translateX(-50%);
-  background: var(--champagne);
-  box-shadow: 0 0 10px var(--champagne);
+  background: var(--metal);
+  box-shadow: 0 0 10px var(--metal);
 }
 
 .dock__actions {
@@ -1278,7 +1416,7 @@ button {
   border: 1px solid var(--line-2);
   border-radius: 999px;
   background: var(--glass);
-  color: var(--ivory);
+  color: var(--ink);
   font-size: 0.8125rem;
   font-weight: 500;
   cursor: pointer;
@@ -1296,14 +1434,14 @@ button {
 .dock__studio:hover,
 .tool:hover:not(:disabled) {
   background: var(--glass-2);
-  border-color: var(--champagne-soft);
+  border-color: var(--metal-soft);
 }
 
 .dock__studio[aria-expanded="true"],
 .tool[aria-pressed="true"] {
-  border-color: var(--champagne);
+  border-color: var(--metal);
   background: rgb(235 204 167 / 0.12);
-  color: var(--champagne);
+  color: var(--metal);
 }
 
 .tool:disabled {
@@ -1363,11 +1501,11 @@ button {
   overscroll-behavior: contain;
   padding: 1.25rem var(--gutter) 2rem;
   border-radius: 26px 26px 0 0;
-  background: rgb(17 9 12 / 0.9);
+  background: var(--sheet);
   border-top: 1px solid var(--line-2);
   -webkit-backdrop-filter: blur(26px) saturate(1.3);
   backdrop-filter: blur(26px) saturate(1.3);
-  box-shadow: 0 -30px 70px -20px rgb(0 0 0 / 0.85);
+  box-shadow: 0 -30px 70px -20px var(--shadow);
   transform: translateY(105%);
   /* Closed, it is hidden outright once it has slid away, so no edge of it
      can show under a browser's sliding toolbars. */
@@ -1394,7 +1532,7 @@ button {
     padding: 1.5rem 1.5rem 2rem;
     border: 1px solid var(--line-2);
     border-radius: 26px;
-    box-shadow: 30px 0 80px -30px rgb(0 0 0 / 0.9);
+    box-shadow: 30px 0 80px -30px var(--shadow);
     transform: translateX(calc(-100% - 2rem));
   }
 }
@@ -1423,7 +1561,7 @@ button {
   border-radius: 50%;
   border: 1px solid var(--line-2);
   background: var(--glass);
-  color: var(--ivory);
+  color: var(--ink);
   cursor: pointer;
 }
 
@@ -1433,12 +1571,12 @@ button {
 }
 
 .studio__close:hover {
-  border-color: var(--champagne-soft);
+  border-color: var(--metal-soft);
 }
 
 .studio__note {
   margin-top: 1.5rem;
-  color: var(--ash);
+  color: var(--ink-3);
   font-size: 0.8125rem;
 }
 
@@ -1448,7 +1586,7 @@ button {
   gap: 4px;
   padding: 4px;
   border-radius: 18px;
-  background: rgb(255 238 234 / 0.05);
+  background: var(--well);
   border: 1px solid var(--line);
 }
 
@@ -1469,7 +1607,7 @@ button {
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: var(--smoke);
+  color: var(--ink-2);
   font-size: 0.8125rem;
   font-weight: 500;
   cursor: pointer;
@@ -1477,12 +1615,12 @@ button {
 }
 
 .tab:hover {
-  color: var(--ivory);
+  color: var(--ink);
 }
 
 .tab[aria-selected="true"] {
-  background: var(--ivory);
-  color: var(--ink-on-ivory);
+  background: var(--pill);
+  color: var(--pill-ink);
 }
 
 .tab__dot {
@@ -1523,11 +1661,11 @@ button {
 }
 
 .product__shade[data-preview="true"] {
-  color: var(--champagne);
+  color: var(--metal);
 }
 
 .product[data-on="false"] .product__shade {
-  color: var(--ash);
+  color: var(--ink-3);
 }
 
 .switch {
@@ -1537,7 +1675,7 @@ button {
   flex: none;
   border: 1px solid var(--line-2);
   border-radius: 999px;
-  background: rgb(255 238 234 / 0.08);
+  background: var(--well-2);
   cursor: pointer;
   transition: background-color 260ms var(--ease), border-color 260ms var(--ease);
 }
@@ -1550,7 +1688,7 @@ button {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: var(--smoke);
+  background: var(--ink-2);
   transition: transform 300ms var(--spring), background-color 260ms var(--ease);
 }
 
@@ -1611,7 +1749,7 @@ button {
 }
 
 .swatch--pan[aria-pressed="true"] .swatch__art {
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.25), 0 0 0 3px #2a1b20, 0 0 0 5px var(--champagne),
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.25), 0 0 0 3px #2a1b20, 0 0 0 5px var(--metal),
     0 0 18px 2px rgb(235 204 167 / 0.35);
 }
 
@@ -1682,7 +1820,7 @@ button {
 
 .slider__label,
 .slider__value {
-  color: var(--smoke);
+  color: var(--ink-2);
   font-size: 0.875rem;
 }
 
@@ -1709,7 +1847,7 @@ button {
     to right,
     var(--product) 0,
     var(--product) var(--fill),
-    rgb(255 238 234 / 0.14) var(--fill)
+    var(--track) var(--fill)
   );
 }
 
@@ -1720,7 +1858,7 @@ button {
     to right,
     var(--product) 0,
     var(--product) var(--fill),
-    rgb(255 238 234 / 0.14) var(--fill)
+    var(--track) var(--fill)
   );
 }
 
@@ -1730,8 +1868,8 @@ button {
   height: 22px;
   margin-top: -9px;
   border-radius: 50%;
-  border: 2px solid var(--champagne);
-  background: var(--ivory);
+  border: 2px solid var(--metal);
+  background: var(--ink);
   box-shadow: 0 2px 10px rgb(0 0 0 / 0.5);
 }
 
@@ -1739,8 +1877,8 @@ button {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  border: 2px solid var(--champagne);
-  background: var(--ivory);
+  border: 2px solid var(--metal);
+  background: var(--ink);
   box-shadow: 0 2px 10px rgb(0 0 0 / 0.5);
 }
 
@@ -1754,7 +1892,7 @@ button {
   gap: 4px;
   padding: 4px;
   border-radius: 999px;
-  background: rgb(255 238 234 / 0.05);
+  background: var(--well);
   border: 1px solid var(--line);
 }
 
@@ -1763,7 +1901,7 @@ button {
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: var(--smoke);
+  color: var(--ink-2);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
@@ -1771,12 +1909,12 @@ button {
 }
 
 .segmented button[aria-pressed="true"] {
-  background: var(--ivory);
-  color: var(--ink-on-ivory);
+  background: var(--pill);
+  color: var(--pill-ink);
 }
 
 .product__blurb {
-  color: var(--ash);
+  color: var(--ink-3);
   font-size: 0.875rem;
 }
 
@@ -1795,7 +1933,7 @@ button {
   width: min(70%, 56rem);
   height: 1px;
   transform: translateX(-50%);
-  background: linear-gradient(90deg, transparent, var(--champagne-soft), transparent);
+  background: linear-gradient(90deg, transparent, var(--metal-soft), transparent);
 }
 
 .story__intro {
@@ -1829,7 +1967,7 @@ button {
   z-index: 2;
   height: 46svh;
   padding-bottom: 0.75rem;
-  background: linear-gradient(to bottom, var(--night) 85%, transparent);
+  background: linear-gradient(to bottom, var(--ground) 85%, transparent);
 }
 
 .story__frame {
@@ -1837,8 +1975,8 @@ button {
   height: 100%;
   overflow: hidden;
   border-radius: 28px;
-  background: var(--night-3);
-  box-shadow: 0 0 0 1px var(--line), 0 40px 90px -40px rgb(0 0 0 / 0.9),
+  background: var(--ground-3);
+  box-shadow: 0 0 0 1px var(--line), 0 40px 90px -40px var(--shadow),
     0 0 80px -30px color-mix(in oklab, var(--shade) 45%, transparent);
 }
 
@@ -1847,7 +1985,7 @@ button {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(100deg, transparent 20%, rgb(255 238 234 / 0.06) 50%, transparent 80%);
+  background: linear-gradient(100deg, transparent 20%, var(--glass-2) 50%, transparent 80%);
   background-size: 220% 100%;
   animation: shimmer 1.8s linear 5;
 }
@@ -1904,7 +2042,7 @@ button {
   content: "";
   position: absolute;
   inset: 0;
-  background: var(--champagne);
+  background: var(--metal);
   transform: scaleX(0);
   transform-origin: left;
   transition: transform 700ms var(--ease);
@@ -1925,7 +2063,7 @@ button {
   background: rgb(11 6 8 / 0.6);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
-  color: var(--ivory);
+  color: var(--on-photo);
   font-size: 0.75rem;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -1962,7 +2100,7 @@ button {
   height: 44px;
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  border: 1px solid var(--champagne);
+  border: 1px solid var(--metal-on-photo);
   background: rgb(11 6 8 / 0.5) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f7ede8' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M9.5 8 6 12l3.5 4'/><path d='m14.5 8 3.5 4-3.5 4'/></svg>") center / 22px no-repeat;
   box-shadow: 0 0 0 4px rgb(235 204 167 / 0.12);
 }
@@ -1972,7 +2110,7 @@ button {
 }
 
 .story__drag:focus-visible::after {
-  outline: 2px solid var(--champagne);
+  outline: 2px solid var(--metal);
   outline-offset: 4px;
 }
 
@@ -2004,14 +2142,14 @@ button {
 .chapter:not([data-active="true"]) .chapter__num,
 .chapter:not([data-active="true"]) .chapter__title,
 .chapter:not([data-active="true"]) .chapter__body {
-  color: var(--ash);
+  color: var(--ink-3);
 }
 
 .chapter__num {
   font-family: var(--font-display);
   font-size: 1.1rem;
   font-weight: 500;
-  color: var(--champagne);
+  color: var(--metal);
 }
 
 .chapter__title {
@@ -2026,7 +2164,7 @@ button {
 
 .chapter__body {
   max-width: 31rem;
-  color: var(--smoke);
+  color: var(--ink-2);
   font-size: 1.0625rem;
   line-height: 1.7;
 }
@@ -2043,7 +2181,7 @@ button {
 }
 
 .shift figcaption {
-  color: var(--ivory);
+  color: var(--ink);
   font-size: 0.8125rem;
   font-weight: 600;
 }
@@ -2053,7 +2191,7 @@ button {
   grid-template-columns: 4.5rem 1fr 2.5rem;
   align-items: center;
   gap: 0.7rem;
-  color: var(--smoke);
+  color: var(--ink-2);
   font-size: 0.8125rem;
 }
 
@@ -2061,7 +2199,7 @@ button {
   height: 8px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgb(255 238 234 / 0.08);
+  background: var(--well-2);
 }
 
 .shift__bar {
@@ -2069,7 +2207,7 @@ button {
   width: 0;
   height: 100%;
   border-radius: 999px;
-  background: var(--ash);
+  background: var(--ink-3);
   transition: width 1200ms var(--ease) 200ms;
 }
 
@@ -2078,7 +2216,7 @@ button {
 }
 
 .shift__row--ours {
-  color: var(--ivory);
+  color: var(--ink);
   font-weight: 600;
 }
 
@@ -2092,14 +2230,14 @@ button {
 }
 
 .shift__note {
-  color: var(--ash);
+  color: var(--ink-3);
   font-size: 0.8125rem;
 }
 
 .story__more {
   max-width: 44rem;
   margin-top: clamp(2rem, 5vw, 3.5rem);
-  color: var(--smoke);
+  color: var(--ink-2);
 }
 
 .story__more a,
@@ -2111,8 +2249,8 @@ button {
 
 .story__more a:hover,
 .site-footer a:hover {
-  color: var(--ivory);
-  text-decoration-color: var(--champagne);
+  color: var(--ink);
+  text-decoration-color: var(--metal);
 }
 
 @media (min-width: 64rem) {
@@ -2216,8 +2354,8 @@ button {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  border: 1px solid var(--champagne-soft);
-  color: var(--champagne);
+  border: 1px solid var(--metal-soft);
+  color: var(--metal);
 }
 
 .privacy__icon svg {
@@ -2234,7 +2372,7 @@ button {
 }
 
 .privacy__points p {
-  color: var(--smoke);
+  color: var(--ink-2);
 }
 
 /* ---- footer ---------------------------------------------------------------- */
@@ -2242,7 +2380,7 @@ button {
 .site-footer {
   padding-block: 2.75rem 3rem;
   border-top: 1px solid var(--line);
-  color: var(--ash);
+  color: var(--ink-3);
   font-size: 0.875rem;
 }
 
@@ -2257,14 +2395,14 @@ button {
   font-family: var(--font-display);
   font-size: 1.75rem;
   font-weight: 500;
-  color: var(--ivory);
+  color: var(--ink);
 }
 
 .site-footer__links {
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem 1.6rem;
-  color: var(--smoke);
+  color: var(--ink-2);
 }
 
 .site-footer__credit {
