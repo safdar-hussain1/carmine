@@ -45,7 +45,8 @@
   --surface: #fffcfb;
   --ink: #2a1c1f;
   --ink-2: #5f4b50;
-  --ink-3: #85717a;
+  /* The quietest text tone, kept above 4.5:1 on every light ground it sits on. */
+  --ink-3: #766169;
   --line: #e7dbd8;
   --line-2: #d4c3c0;
 
