@@ -1,502 +1,343 @@
 /**
  * How it works, told by the engine as you scroll.
  *
- * The section pins one picture while four short chapters scroll past it.
- * Each chapter swaps the picture for its step and plays it: the landmark
- * mesh drawing itself across the face, the masks blooming in, a flat fill
- * and Carmine's tint of the same lipstick split down the lips (and
- * draggable), and the finished look fading in over the bare face.
+ * One picture stays pinned while four short chapters scroll past it, and
+ * the picture is driven by how far through its chapter the reader is:
  *
- * Every picture is made live, in the browser, from the sample portrait the
- * mirror has already analysed -- nothing here is a prepared image, so the
- * section cannot describe a pipeline the page does not actually run.
+ * 1. Find the face: the sample's 478 landmarks as a mesh in 3D, turning as
+ *    you scroll (and under a drag), drawn from the depth the model gives
+ *    every point.
+ * 2. Shape soft masks: the look taken apart, one sheet per product floating
+ *    over the face in the order the shader paints them.
+ * 3. Change the colour, keep the texture: the lip's real pixels as a cloud
+ *    in colour space, morphing from the untouched lip to a flat fill (the
+ *    whole cloud lifted toward white) to Carmine (moved in colour, kept in
+ *    lightness).
+ * 4. Paint it in one pass: the sheets fall back together and turn to face
+ *    you, and become the engine's finished render.
  *
- * The flat fill is the photo benchmark's opaque-fill baseline, for the
- * lips: the lip polygon filled hard and added on top of the picture, which
- * is what `cv2.fillPoly` plus `cv2.addWeighted` do in `carmine.baselines`,
- * and what a canvas "lighter" composite does here. It is painted with the
- * lipstick the benchmark used -- the velvet look's, at satin -- so the
- * picture and the measured lightness shift quoted beside it describe the
- * same comparison.
+ * Everything is made in the browser from the sample the mirror already
+ * painted -- nothing here is a prepared image or video, so the section
+ * cannot describe a pipeline the page does not actually run. The lipstick
+ * in chapter 3 is the one the photo benchmark used, the velvet look's at a
+ * satin finish, so the cloud and the measured lightness shift quoted beside
+ * it describe the same comparison.
  */
 
-import { FaceLandmarker } from "@mediapipe/tasks-vision";
-import { createRenderer, type Renderer } from "../engine/renderer";
+import { animate } from "motion";
 import { hexToRgb } from "../engine/color";
-import { PRESETS, PRODUCT_ORDER, type LookConfig, type ProductName } from "../engine/look";
+import { lightnessPullFor, PRESETS, type LookConfig } from "../engine/look";
+import { buildMasks } from "../engine/masks";
 import constants from "../gen/constants.json";
-import { applyLookCpu, masksFor, toFloatPixels, toImageData, toProcessingCanvas } from "./pipeline";
-import { glossFor, type PhotoScene } from "./scene";
-import { easeInOut, mixLook, withoutMakeup } from "./tween";
-
-const R = constants.regions;
+import { buildCloud } from "./colorCloud";
+import { createCloudView, type CloudState, type CloudView, type Weights } from "./cloudArt";
+import { createLayerStack, type LayerStack } from "./layers";
+import { centroid, project } from "./mesh3d";
+import { drawMesh } from "./meshArt";
+import { cropAround, cropTo, renderLook } from "./offscreen";
+import { toFloatPixels, toProcessingCanvas } from "./pipeline";
+import type { PhotoScene } from "./scene";
+import { easeInOut, withoutMakeup } from "./tween";
 
 type Step = "landmarks" | "masks" | "texture" | "final";
 const STEPS: Step[] = ["landmarks", "masks", "texture", "final"];
 
-/** How long each chapter's picture takes to play in. */
-const PLAY_MS: Record<Step, number> = { landmarks: 1600, masks: 1000, texture: 1100, final: 1100 };
-
-/** Longest side of a chapter canvas, in pixels: sharp on a retina screen
- * without four full-screen buffers' worth of memory. */
-const MAX_CANVAS_SIDE = 1400;
-
-/** One colour per mask in the masks picture, picked to tell the regions
- * apart on a greyscale face rather than to be wearable. */
-const MASK_COLOURS: Record<ProductName, string> = {
-  lipstick: "#e3345c",
-  eyeshadow: "#9a62d6",
-  eyeliner: "#3d55c4",
-  brows: "#c27a35",
-  blush: "#ff8f78",
-  highlighter: "#fff1cf",
+/** The look the sheets show: every product on, each in a named shade, so
+ * all six sheets have something on them. */
+const SHOWCASE: LookConfig = {
+  blush: { color: "#D96C6C", intensity: 0.35, finish: "satin" },
+  highlighter: { color: "#F5D9C8", intensity: 0.55, finish: "satin" },
+  eyeshadow: { color: "#5C3A6E", intensity: 0.5, finish: "satin" },
+  brows: { color: "#4A3728", intensity: 0.35, finish: "satin" },
+  lipstick: { color: "#8E1B3A", intensity: 0.8, finish: "satin" },
+  eyeliner: { color: "#1B1B1B", intensity: 0.75, finish: "satin" },
+  smoothing: 0.25,
 };
 
-/** The benchmark's lipstick: the velvet look's, with the finish at satin. */
-function benchmarkLips(): LookConfig {
+/** The photo benchmark's lipstick: velvet's, at a satin finish. */
+function benchmarkLook(): LookConfig {
   const look = withoutMakeup(PRESETS.velvet);
   look.lipstick = { ...PRESETS.velvet.lipstick, finish: "satin" };
   return look;
 }
 
-interface Crop {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-/** A crop of the frame's shape (`aspect`, width over height) centred on
- * (cx, cy), `w` wide, kept inside the picture. */
-function cropAround(cx: number, cy: number, w: number, aspect: number, scene: PhotoScene): Crop {
-  let width = Math.min(w, scene.width, scene.height * aspect);
-  let height = width / aspect;
-  if (height > scene.height) {
-    height = scene.height;
-    width = height * aspect;
-  }
-  const x = Math.min(Math.max(cx - width / 2, 0), scene.width - width);
-  const y = Math.min(Math.max(cy - height / 2, 0), scene.height - height);
-  return { x, y, w: width, h: height };
-}
-
-function point(scene: PhotoScene, index: number): [number, number] {
-  return [scene.landmarks[index * 2], scene.landmarks[index * 2 + 1]];
-}
-
-function bounds(scene: PhotoScene, indices: number[]): Crop {
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const index of indices) {
-    const [x, y] = point(scene, index);
-    minX = Math.min(minX, x);
-    maxX = Math.max(maxX, x);
-    minY = Math.min(minY, y);
-    maxY = Math.max(maxY, y);
-  }
-  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
-}
-
-function canvasOfSize(width: number, height: number): HTMLCanvasElement {
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(width));
-  canvas.height = Math.max(1, Math.round(height));
-  return canvas;
-}
-
-function context(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    throw new Error("2D canvas context unavailable");
-  }
-  return ctx;
+function ramp(t: number, a: number, b: number): number {
+  return Math.min(Math.max((t - a) / (b - a), 0), 1);
 }
 
 function prefersReducedMotion(): boolean {
   return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 }
 
-/** Resolves on the next animation frame: a place to hand the main thread
- * back, so a long build is several short tasks instead of one long one. */
-function nextFrame(): Promise<void> {
-  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
-}
-
-/** Runs `work` when the browser is idle, or soon if it never is. */
 function whenIdle(work: () => void): void {
   const idle = (window as Window & {
     requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number;
   }).requestIdleCallback;
   if (idle) {
-    idle(work, { timeout: 1200 });
+    idle(work, { timeout: 1500 });
   } else {
     window.setTimeout(work, 1);
   }
 }
 
-/** Everything a chapter draws from, at the frame's pixel size. */
-interface Layers {
-  width: number;
-  height: number;
-  /** Landmarks: the face, darkened, and the mesh in frame coordinates. */
-  dim: HTMLCanvasElement;
-  points: Float32Array;
-  /** Mesh edges as point-index pairs, bucketed by distance from the face's
-   * middle so they can ripple outward. */
-  meshBuckets: Uint16Array[];
-  /** Masks: the face in grey, and every mask in its colour. */
-  grey: HTMLCanvasElement;
-  maskArt: HTMLCanvasElement;
-  /** Texture: the lips, flat-filled and tinted. */
-  flat: HTMLCanvasElement;
-  tinted: HTMLCanvasElement;
-  /** Final: the face bare and with the current look. */
-  bare: HTMLCanvasElement;
-  made: HTMLCanvasElement;
-}
-
 export interface Story {
   setScene(scene: PhotoScene): void;
-  /** The last chapter shows whatever look is on the mirror. */
-  setLook(look: LookConfig): void;
 }
 
-export function createStory(section: HTMLElement, look: LookConfig): Story {
-  const frame = section.querySelector<HTMLElement>(".story__frame");
+export function createStory(section: HTMLElement): Story {
+  const stage = section.querySelector<HTMLElement>(".story__stage");
+  const meshCanvas = section.querySelector<HTMLCanvasElement>(".scene--mesh");
+  const layersHost = section.querySelector<HTMLElement>(".scene--layers");
+  const cloudCanvas = section.querySelector<HTMLCanvasElement>(".cloud__canvas");
+  const chips = [...section.querySelectorAll<HTMLButtonElement>(".cloud__chip")];
+  const insets = new Map<CloudState, HTMLCanvasElement>();
+  section.querySelectorAll<HTMLCanvasElement>(".cloud__inset canvas").forEach((canvas) => {
+    insets.set(canvas.dataset.state as CloudState, canvas);
+  });
   const chapters = [...section.querySelectorAll<HTMLElement>(".chapter")];
   const progress = [...section.querySelectorAll<HTMLElement>(".story__progress span")];
-  const canvases = new Map<Step, HTMLCanvasElement>();
-  for (const step of STEPS) {
-    const canvas = section.querySelector<HTMLCanvasElement>(`.story__canvas[data-step="${step}"]`);
-    if (canvas) {
-      canvases.set(step, canvas);
-    }
-  }
+  const counter = section.querySelector<HTMLElement>("[data-count]");
+  const reduced = prefersReducedMotion();
+  const wide = window.matchMedia?.("(min-width: 62.5rem)");
 
   let scene: PhotoScene | null = null;
-  let current = mixLook(look, look, 1);
-  let layers: Layers | null = null;
-  let active: Step = "landmarks";
-  /** Whether the active chapter has played since it became active. */
-  let played = false;
-  /** A chapter became active before its picture was built. */
-  let pendingPlay = false;
+  let built = false;
   let near = false;
-  let buildToken = 0;
-  let builtSize = { width: 0, height: 0 };
-  let split = 0.5;
-  let animation = 0;
-  let renderer: Renderer | null = null;
-  let rendererTried = false;
-  const glCanvas = document.createElement("canvas");
+  let visible = false;
+  let raf = 0;
 
-  // The comparison in the third chapter can be dragged, with a pointer or
-  // with the arrow keys.
-  const drag = document.createElement("div");
-  drag.className = "story__drag";
-  drag.tabIndex = 0;
-  drag.setAttribute("role", "slider");
-  drag.setAttribute("aria-label", "Flat fill and Carmine split");
-  drag.setAttribute("aria-valuemin", "0");
-  drag.setAttribute("aria-valuemax", "100");
-  frame?.append(drag);
+  let active: Step | null = null;
+  let progressNow = 0;
+  let smooth = 0;
 
-  function engine(): Renderer | null {
-    if (!rendererTried) {
-      rendererTried = true;
-      renderer = createRenderer(glCanvas);
+  // ---- 1: the mesh ----------------------------------------------------------
+
+  let meshXY = new Float32Array(0);
+  let meshZ = new Float32Array(0);
+  let meshCenter = { cx: 0, cy: 0 };
+  let meshProjected = new Float32Array(0);
+  let meshDepth = new Float32Array(0);
+  let meshFocal = 1;
+  let meshUnit = 1;
+  let dragYaw = 0;
+  let dragging = false;
+  let dragFrom = 0;
+  let dragStartYaw = 0;
+
+  function layoutMesh(): void {
+    if (!meshCanvas || !scene?.depth) {
+      return;
     }
-    return renderer;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const rect = meshCanvas.getBoundingClientRect();
+    meshCanvas.width = Math.max(1, Math.round(rect.width * dpr));
+    meshCanvas.height = Math.max(1, Math.round(rect.height * dpr));
+    const count = scene.landmarks.length / 2;
+    const face = centroid(scene.landmarks);
+    const size = Math.max(scene.face.width, scene.face.height);
+    const fit = (Math.min(meshCanvas.width, meshCanvas.height) * 0.72) / size;
+    meshXY = new Float32Array(count * 2);
+    meshZ = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+      meshXY[i * 2] = meshCanvas.width / 2 + (scene.landmarks[i * 2] - face.cx) * fit;
+      meshXY[i * 2 + 1] = meshCanvas.height / 2 + (scene.landmarks[i * 2 + 1] - face.cy) * fit;
+      meshZ[i] = scene.depth[i] * fit;
+    }
+    meshCenter = { cx: meshCanvas.width / 2, cy: meshCanvas.height / 2 };
+    meshProjected = new Float32Array(count * 2);
+    meshDepth = new Float32Array(count);
+    meshFocal = size * fit * 2.6;
+    meshUnit = dpr * Math.min(Math.max(rect.width / 560, 0.85), 1.5);
   }
 
-  /** The look rendered over the whole picture, at full resolution. */
-  function rendered(s: PhotoScene, which: LookConfig): CanvasImageSource | null {
-    const active = engine();
-    if (active) {
-      active.resize(s.width, s.height);
-      active.render(s.source, s.masks, which, glossFor(s, which), {});
-      // Read straight away: without preserveDrawingBuffer the drawing
-      // buffer is only kept until the browser next composites the page.
-      const copy = canvasOfSize(s.width, s.height);
-      context(copy).drawImage(glCanvas, 0, 0);
-      return copy;
+  function drawMeshScene(now: number, t: number): void {
+    const ctx = meshCanvas?.getContext("2d");
+    if (!meshCanvas || !ctx || meshZ.length === 0) {
+      return;
     }
-    // No WebGL2: the CPU reference at processing size, scaled back up.
+    if (!dragging) {
+      dragYaw *= 0.92;
+    }
+    const sway = reduced ? 0 : Math.sin(now / 1400) * 0.05;
+    const yaw = -0.85 + 1.7 * t + sway + dragYaw;
+    const pitch = 0.1 + (reduced ? 0 : Math.sin(now / 2100) * 0.04);
+    project(meshXY, meshZ, meshCenter, yaw, pitch, meshFocal, 1, meshProjected, meshDepth);
+    ctx.clearRect(0, 0, meshCanvas.width, meshCanvas.height);
+    drawMesh(ctx, { points: meshProjected, depth: meshDepth, edgeAlpha: 0.95, pointAlpha: 1, unit: meshUnit });
+  }
+
+  meshCanvas?.addEventListener("pointerdown", (event) => {
+    dragging = true;
+    dragFrom = event.clientX;
+    dragStartYaw = dragYaw;
+    meshCanvas.setPointerCapture(event.pointerId);
+  });
+  meshCanvas?.addEventListener("pointermove", (event) => {
+    if (dragging) {
+      dragYaw = dragStartYaw + (event.clientX - dragFrom) * 0.008;
+    }
+  });
+  const endMeshDrag = () => {
+    dragging = false;
+  };
+  meshCanvas?.addEventListener("pointerup", endMeshDrag);
+  meshCanvas?.addEventListener("pointercancel", endMeshDrag);
+
+  // ---- 2 and 4: the sheets ----------------------------------------------------
+
+  let layers: LayerStack | null = null;
+  let lastLayers = "";
+
+  function setLayers(explode: number, tilt: number, finished: number): void {
+    const key = `${explode.toFixed(3)}|${tilt.toFixed(3)}|${finished.toFixed(3)}`;
+    if (key !== lastLayers) {
+      lastLayers = key;
+      layers?.set(explode, tilt, finished);
+    }
+  }
+
+  // ---- 3: the colour cloud ---------------------------------------------------
+
+  let cloudView: CloudView | null = null;
+  let manual: { from: Weights; to: CloudState; start: number } | null = null;
+  let shownWeights: Weights = { original: 1, flat: 0, carmine: 0 };
+
+  function scrollWeights(t: number): Weights {
+    const toFlat = easeInOut(ramp(t, 0.18, 0.42));
+    const toCarmine = easeInOut(ramp(t, 0.58, 0.82));
+    const flat = toFlat * (1 - toCarmine);
+    return { original: 1 - flat - toCarmine, flat, carmine: toCarmine };
+  }
+
+  function weightsNow(now: number, t: number): Weights {
+    if (!manual) {
+      return scrollWeights(t);
+    }
+    const k = reduced ? 1 : easeInOut(Math.min((now - manual.start) / 700, 1));
+    const goal: Weights = { original: 0, flat: 0, carmine: 0 };
+    goal[manual.to] = 1;
+    return {
+      original: manual.from.original + (goal.original - manual.from.original) * k,
+      flat: manual.from.flat + (goal.flat - manual.from.flat) * k,
+      carmine: manual.from.carmine + (goal.carmine - manual.from.carmine) * k,
+    };
+  }
+
+  function showWeights(weights: Weights, now: number): void {
+    shownWeights = weights;
+    const yaw = 0.75 + (reduced ? 0 : Math.sin(now / 3200) * 0.3);
+    cloudView?.draw(weights, yaw, 0.38);
+    const dominant = (Object.keys(weights) as CloudState[]).reduce((best, key) =>
+      weights[key] > weights[best] ? key : best,
+    );
+    for (const chip of chips) {
+      chip.setAttribute("aria-pressed", String(chip.dataset.state === dominant));
+    }
+    for (const [state, canvas] of insets) {
+      canvas.style.opacity = String(weights[state]);
+    }
+  }
+
+  for (const chip of chips) {
+    chip.addEventListener("click", () => {
+      manual = { from: shownWeights, to: chip.dataset.state as CloudState, start: performance.now() };
+    });
+  }
+
+  // ---- building everything once ------------------------------------------------
+
+  function buildCloudScene(s: PhotoScene): void {
+    if (!cloudCanvas) {
+      return;
+    }
     const proc = toProcessingCanvas(s.source, s.width, s.height);
     const ctx = proc.getContext("2d", { willReadFrequently: true });
     if (!ctx) {
-      return null;
+      return;
     }
-    const data = ctx.getImageData(0, 0, proc.width, proc.height);
-    const painted = applyLookCpu(toFloatPixels(data), masksFor(s.landmarks, s.width, s.height, which), which);
-    ctx.putImageData(toImageData(painted, proc.width, proc.height), 0, 0);
-    const full = canvasOfSize(s.width, s.height);
-    context(full).drawImage(proc, 0, 0, s.width, s.height);
-    return full;
-  }
-
-  function frameSize(): { width: number; height: number } | null {
-    if (!frame) {
-      return null;
+    const pixels = toFloatPixels(ctx.getImageData(0, 0, proc.width, proc.height));
+    const lipMask = buildMasks(s.landmarks, s.width, s.height, new Set(["lipstick"]), "exact").masks.lipstick;
+    if (!lipMask) {
+      return;
     }
-    const rect = frame.getBoundingClientRect();
-    if (rect.width < 10 || rect.height < 10) {
-      return null;
-    }
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const scale = Math.min(dpr, MAX_CANVAS_SIDE / Math.max(rect.width, rect.height));
-    return { width: Math.round(rect.width * scale), height: Math.round(rect.height * scale) };
-  }
-
-  function crop(source: CanvasImageSource, area: Crop, width: number, height: number): HTMLCanvasElement {
-    const out = canvasOfSize(width, height);
-    context(out).drawImage(source, area.x, area.y, area.w, area.h, 0, 0, width, height);
-    return out;
-  }
-
-  /** Builds every chapter's raw material once, at the frame's size, in
-   * steps with a frame between them so scrolling stays smooth meanwhile. */
-  async function prepare(s: PhotoScene): Promise<Layers | null> {
-    const size = frameSize();
-    if (!size) {
-      return null;
-    }
-    const { width, height } = size;
-    const aspect = width / height;
-    const box = s.face;
-    const face = cropAround(
-      box.cx,
-      box.cy,
-      Math.max(box.width * 1.32, box.height * 1.32 * aspect),
-      aspect,
-      s,
+    const lips = benchmarkLook().lipstick;
+    const cloud = buildCloud(
+      pixels,
+      lipMask,
+      hexToRgb(lips.color),
+      lips.intensity,
+      lightnessPullFor("lipstick", lips.finish),
+      1400,
     );
-    const lipsBox = bounds(s, R.LIPS_OUTER);
-    const lips = cropAround(lipsBox.x + lipsBox.w / 2, lipsBox.y + lipsBox.h / 2, lipsBox.w * 1.35, aspect, s);
-    const toFrame = (area: Crop, x: number, y: number): [number, number] => [
-      ((x - area.x) / area.w) * width,
-      ((y - area.y) / area.h) * height,
-    ];
+    cloudView = createCloudView(cloudCanvas, cloud);
 
-    // Landmarks.
-    const dim = crop(s.source, face, width, height);
-    const dimCtx = context(dim);
-    dimCtx.fillStyle = "rgba(10, 4, 7, 0.55)";
-    dimCtx.fillRect(0, 0, width, height);
-    const count = s.landmarks.length / 2;
-    const points = new Float32Array(count * 2);
-    for (let i = 0; i < count; i++) {
-      const [x, y] = toFrame(face, s.landmarks[i * 2], s.landmarks[i * 2 + 1]);
-      points[i * 2] = x;
-      points[i * 2 + 1] = y;
+    // The three lips, small, beside the cloud: what each state looks like.
+    const outer = constants.regions.LIPS_OUTER;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const index of outer) {
+      minX = Math.min(minX, s.landmarks[index * 2]);
+      maxX = Math.max(maxX, s.landmarks[index * 2]);
+      minY = Math.min(minY, s.landmarks[index * 2 + 1]);
+      maxY = Math.max(maxY, s.landmarks[index * 2 + 1]);
     }
-    const BUCKETS = 18;
-    const reach = Math.hypot(box.width, box.height) / 2 || 1;
-    const lists: number[][] = Array.from({ length: BUCKETS }, () => []);
-    for (const edge of FaceLandmarker.FACE_LANDMARKS_TESSELATION) {
-      const [ax, ay] = point(s, edge.start);
-      const [bx, by] = point(s, edge.end);
-      const distance = Math.min(Math.hypot((ax + bx) / 2 - box.cx, (ay + by) / 2 - box.cy) / reach, 0.999);
-      lists[Math.floor(distance * BUCKETS)].push(edge.start, edge.end);
-    }
-    const meshBuckets = lists.map((list) => Uint16Array.from(list));
-
-    await nextFrame();
-
-    // Masks.
-    const grey = crop(s.source, face, width, height);
-    const greyCtx = context(grey);
-    const pixels = greyCtx.getImageData(0, 0, width, height);
-    const px = pixels.data;
-    for (let i = 0; i < px.length; i += 4) {
-      const luma = 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
-      const value = 12 + luma * 0.62;
-      px[i] = px[i + 1] = px[i + 2] = value;
-    }
-    greyCtx.putImageData(pixels, 0, 0);
-
-    const { masks } = s;
-    const art = canvasOfSize(masks.width, masks.height);
-    const artCtx = context(art);
-    const image = artCtx.createImageData(masks.width, masks.height);
-    const out = image.data;
-    for (const name of PRODUCT_ORDER) {
-      const mask = masks.masks[name];
-      if (!mask) {
-        continue;
-      }
-      const [r, g, b] = hexToRgb(MASK_COLOURS[name]);
-      for (let i = 0; i < mask.length; i++) {
-        const a = mask[i] * 0.92;
-        if (a < 0.01) {
-          continue;
+    const area = cropAround((minX + maxX) / 2, (minY + maxY) / 2, (maxX - minX) * 1.45, 1.6, s.width, s.height);
+    const painted = renderLook(s, benchmarkLook());
+    for (const [state, canvas] of insets) {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(1, Math.round(rect.width * dpr));
+      const height = Math.max(1, Math.round(rect.height * dpr));
+      const picture = cropTo(state === "carmine" ? painted : s.source, area, width, height);
+      if (state === "flat") {
+        const flatCtx = picture.getContext("2d");
+        if (flatCtx) {
+          flatCtx.globalCompositeOperation = "lighter";
+          flatCtx.globalAlpha = Math.min(1, lips.intensity);
+          flatCtx.fillStyle = lips.color;
+          flatCtx.beginPath();
+          outer.forEach((index, i) => {
+            const x = ((s.landmarks[index * 2] - area.x) / area.w) * width;
+            const y = ((s.landmarks[index * 2 + 1] - area.y) / area.h) * height;
+            if (i === 0) {
+              flatCtx.moveTo(x, y);
+            } else {
+              flatCtx.lineTo(x, y);
+            }
+          });
+          flatCtx.closePath();
+          flatCtx.fill();
         }
-        const p = i * 4;
-        const under = out[p + 3] / 255;
-        const alpha = a + under * (1 - a);
-        out[p] = (r * a + out[p] * under * (1 - a)) / alpha;
-        out[p + 1] = (g * a + out[p + 1] * under * (1 - a)) / alpha;
-        out[p + 2] = (b * a + out[p + 2] * under * (1 - a)) / alpha;
-        out[p + 3] = alpha * 255;
       }
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d")?.drawImage(picture, 0, 0);
     }
-    artCtx.putImageData(image, 0, 0);
-    const k = masks.scale;
-    const maskArt = canvasOfSize(width, height);
-    const maskCtx = context(maskArt);
-    maskCtx.imageSmoothingQuality = "high";
-    maskCtx.drawImage(art, face.x * k, face.y * k, face.w * k, face.h * k, 0, 0, width, height);
-
-    await nextFrame();
-
-    // Texture: the flat fill added on top of the lips, and the engine's tint.
-    const lipsLook = benchmarkLips();
-    const flat = crop(s.source, lips, width, height);
-    const flatCtx = context(flat);
-    flatCtx.globalCompositeOperation = "lighter";
-    flatCtx.globalAlpha = Math.min(1, lipsLook.lipstick.intensity);
-    flatCtx.fillStyle = lipsLook.lipstick.color;
-    flatCtx.beginPath();
-    R.LIPS_OUTER.forEach((index, i) => {
-      const [x, y] = toFrame(lips, ...point(s, index));
-      if (i === 0) {
-        flatCtx.moveTo(x, y);
-      } else {
-        flatCtx.lineTo(x, y);
-      }
-    });
-    flatCtx.closePath();
-    flatCtx.fill();
-    const tintedFull = rendered(s, lipsLook) ?? s.source;
-    const tinted = crop(tintedFull, lips, width, height);
-
-    await nextFrame();
-
-    // Final.
-    const bare = crop(s.source, face, width, height);
-    const madeFull = rendered(s, current) ?? s.source;
-    const made = crop(madeFull, face, width, height);
-
-    return { width, height, dim, points, meshBuckets, grey, maskArt, flat, tinted, bare, made };
   }
 
-  function sized(step: Step, l: Layers): CanvasRenderingContext2D | null {
-    const canvas = canvases.get(step);
-    if (!canvas) {
-      return null;
+  function build(): void {
+    if (built || !scene || !near) {
+      return;
     }
-    if (canvas.width !== l.width || canvas.height !== l.height) {
-      canvas.width = l.width;
-      canvas.height = l.height;
+    built = true;
+    layoutMesh();
+    if (layersHost) {
+      layers = createLayerStack(scene, SHOWCASE);
+      layersHost.append(layers.element);
+      layers.layout();
     }
-    return canvas.getContext("2d");
+    buildCloudScene(scene);
+    section.dataset.drawn = "true";
+    start();
   }
 
-  /** Draws `step` at progress `t` (0 to 1) of its play-in. */
-  function draw(step: Step, t: number): void {
-    const l = layers;
-    if (!l) {
-      return;
-    }
-    const ctx = sized(step, l);
-    if (!ctx) {
-      return;
-    }
-    const { width, height } = l;
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = "source-over";
-
-    if (step === "landmarks") {
-      ctx.drawImage(l.dim, 0, 0);
-      const unit = width / 600;
-      const buckets = l.meshBuckets.length;
-      ctx.globalCompositeOperation = "lighter";
-      ctx.lineWidth = Math.max(0.6, unit * 0.9);
-      ctx.strokeStyle = "#f0d3ae";
-      for (let b = 0; b < buckets; b++) {
-        const local = Math.min(Math.max((t - (b / buckets) * 0.6) / 0.4, 0), 1);
-        if (local <= 0) {
-          continue;
-        }
-        ctx.globalAlpha = 0.5 * local;
-        ctx.beginPath();
-        const edges = l.meshBuckets[b];
-        for (let i = 0; i < edges.length; i += 2) {
-          const a = edges[i] * 2;
-          const c = edges[i + 1] * 2;
-          ctx.moveTo(l.points[a], l.points[a + 1]);
-          ctx.lineTo(l.points[c], l.points[c + 1]);
-        }
-        ctx.stroke();
-      }
-      const radius = Math.max(1, unit * 1.6);
-      ctx.globalAlpha = Math.min(1, t * 1.4);
-      ctx.fillStyle = "#fff8f1";
-      ctx.beginPath();
-      for (let i = 0; i + 1 < l.points.length; i += 2) {
-        ctx.moveTo(l.points[i] + radius, l.points[i + 1]);
-        ctx.arc(l.points[i], l.points[i + 1], radius, 0, Math.PI * 2);
-      }
-      ctx.fill();
-    } else if (step === "masks") {
-      ctx.drawImage(l.grey, 0, 0);
-      ctx.globalAlpha = easeInOut(t);
-      ctx.drawImage(l.maskArt, 0, 0);
-    } else if (step === "texture") {
-      // The divider sweeps in from the right edge to wherever it rests.
-      const at = 1 - (1 - split) * easeInOut(t);
-      const cut = Math.round(at * width);
-      ctx.drawImage(l.flat, 0, 0);
-      if (cut < width) {
-        ctx.drawImage(l.tinted, cut, 0, width - cut, height, cut, 0, width - cut, height);
-      }
-      ctx.fillStyle = "rgba(255, 248, 241, 0.95)";
-      ctx.fillRect(cut - Math.max(1, width / 600), 0, Math.max(2, width / 300), height);
-      drag.style.setProperty("--split", `${at * 100}%`);
-      drag.setAttribute("aria-valuenow", String(Math.round(at * 100)));
-    } else {
-      ctx.drawImage(l.bare, 0, 0);
-      ctx.globalAlpha = easeInOut(t);
-      ctx.drawImage(l.made, 0, 0);
-    }
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = "source-over";
-  }
-
-  /** Plays the active chapter's picture in from the start. */
-  function play(step: Step): void {
-    cancelAnimationFrame(animation);
-    if (!layers) {
-      pendingPlay = true;
-      return;
-    }
-    pendingPlay = false;
-    if (prefersReducedMotion()) {
-      draw(step, 1);
-      return;
-    }
-    const begin = performance.now();
-    const tick = (now: number) => {
-      const t = Math.min((now - begin) / PLAY_MS[step], 1);
-      draw(step, t);
-      if (t < 1) {
-        animation = requestAnimationFrame(tick);
-      }
-    };
-    animation = requestAnimationFrame(tick);
-  }
+  // ---- following the scroll ----------------------------------------------------
 
   function activate(step: Step): void {
-    if (step === active && played) {
-      return;
-    }
     active = step;
-    played = true;
-    if (frame) {
-      frame.dataset.active = step;
-    }
+    stage?.setAttribute("data-scene", step);
     const index = STEPS.indexOf(step);
     progress.forEach((bar, i) => {
       bar.dataset.state = i < index ? "done" : i === index ? "active" : "";
@@ -504,210 +345,114 @@ export function createStory(section: HTMLElement, look: LookConfig): Story {
     for (const chapter of chapters) {
       chapter.dataset.active = String(chapter.dataset.step === step);
     }
-    play(step);
-  }
-
-  async function build(): Promise<void> {
-    if (!scene || !near) {
-      return;
-    }
-    const token = ++buildToken;
-    const built = await prepare(scene);
-    // A newer build (a resize, a new scene) superseded this one meanwhile.
-    if (token !== buildToken || !built) {
-      return;
-    }
-    layers = built;
-    const rect = frame?.getBoundingClientRect();
-    builtSize = { width: rect?.width ?? 0, height: rect?.height ?? 0 };
-    section.dataset.drawn = "true";
-    // Every frame starts drawn in its finished state, so a chapter that is
-    // reached by a jump (a link, a fast scroll) never shows a blank frame.
-    for (const step of STEPS) {
-      draw(step, 1);
-    }
-    // Played only if its chapter is already on screen; otherwise it plays
-    // when the reader gets there.
-    if (pendingPlay) {
-      play(active);
+    manual = null;
+    if (step === "landmarks" && counter) {
+      const total = Number(counter.dataset.count);
+      if (reduced) {
+        counter.textContent = String(total);
+      } else {
+        animate(0, total, {
+          duration: 1.4,
+          ease: [0.22, 1, 0.36, 1],
+          onUpdate: (value) => {
+            counter.textContent = String(Math.round(value));
+          },
+        });
+      }
     }
   }
 
-  // ---- chapters follow the scroll ----------------------------------------
-
-  let chapterObserver: IntersectionObserver | null = null;
-  const wide = window.matchMedia?.("(min-width: 64rem)");
-  function observeChapters(): void {
-    chapterObserver?.disconnect();
-    if (typeof IntersectionObserver !== "function") {
-      return;
-    }
-    // A thin band across the screen decides the chapter: in the middle when
-    // the picture sits beside the text, below the picture when it is pinned
-    // above the text on a phone.
-    const band = wide?.matches ? "-48% 0px -48% 0px" : "-64% 0px -30% 0px";
-    chapterObserver = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            activate((entry.target as HTMLElement).dataset.step as Step);
-          }
-        }
-      },
-      { rootMargin: band },
-    );
+  function readScroll(): void {
+    const line = window.innerHeight * (wide?.matches ? 0.5 : 0.76);
+    let step: Step = STEPS[0];
+    let t = 0;
     for (const chapter of chapters) {
-      chapterObserver.observe(chapter);
+      const rect = chapter.getBoundingClientRect();
+      if (rect.top <= line) {
+        step = chapter.dataset.step as Step;
+        t = Math.min(Math.max((line - rect.top) / rect.height, 0), 1);
+      }
+    }
+    if (step !== active) {
+      activate(step);
+      smooth = t;
+    }
+    progressNow = t;
+  }
+
+  function frame(now: number): void {
+    raf = 0;
+    if (!visible || !built) {
+      return;
+    }
+    readScroll();
+    smooth = reduced ? progressNow : smooth + (progressNow - smooth) * 0.12;
+    const t = smooth;
+    switch (active) {
+      case "landmarks":
+        drawMeshScene(now, t);
+        break;
+      case "masks":
+        setLayers(easeInOut(ramp(t, 0.05, 0.62)), easeInOut(ramp(t, 0, 0.35)), 0);
+        break;
+      case "texture":
+        showWeights(weightsNow(now, t), now);
+        break;
+      case "final":
+        // The sheets fall together and turn to face you; as they meet they
+        // give way to the engine's real render, so the flat sheets are never
+        // seen face-on as if they were the result.
+        setLayers(1 - easeInOut(ramp(t, 0, 0.6)), 1 - easeInOut(ramp(t, 0.1, 0.7)), easeInOut(ramp(t, 0.3, 0.68)));
+        break;
+    }
+    raf = requestAnimationFrame(frame);
+  }
+
+  function start(): void {
+    if (!raf && visible && built) {
+      raf = requestAnimationFrame(frame);
     }
   }
-  observeChapters();
-  wide?.addEventListener("change", observeChapters);
-  progress.forEach((bar, i) => {
-    bar.dataset.state = i === 0 ? "active" : "";
-  });
-  chapters.forEach((chapter, i) => {
-    chapter.dataset.active = String(i === 0);
-  });
 
-  // The pictures are built once the section is in sight of the viewport,
-  // when the browser is idle: a few full-resolution renders that a reader
-  // who never scrolls here should not pay for.
   if (typeof IntersectionObserver === "function") {
+    // Built when the section is in sight of the viewport; animated only while
+    // it is actually on screen.
     new IntersectionObserver(
       (entries) => {
         near = entries.some((entry) => entry.isIntersecting);
-        if (near && !layers) {
-          whenIdle(() => void build());
+        if (near && !built) {
+          whenIdle(build);
         }
       },
-      { rootMargin: "1200px 0px" },
+      { rootMargin: "1400px 0px" },
     ).observe(section);
+    new IntersectionObserver((entries) => {
+      visible = entries.some((entry) => entry.isIntersecting);
+      start();
+    }).observe(section);
   } else {
     near = true;
+    visible = true;
   }
 
-  // Drawn again only when the frame changes size, in either direction. A
-  // phone fires resize every time its address bar slides away, which (the
-  // frame being sized in svh) changes nothing here.
   let resizeTimer = 0;
   window.addEventListener("resize", () => {
     window.clearTimeout(resizeTimer);
     resizeTimer = window.setTimeout(() => {
-      const rect = frame?.getBoundingClientRect();
-      if (
-        layers &&
-        rect &&
-        (Math.abs(rect.width - builtSize.width) > 1 || Math.abs(rect.height - builtSize.height) > 1)
-      ) {
-        void build();
+      if (!built) {
+        return;
       }
-    }, 200);
+      layoutMesh();
+      layers?.layout();
+      cloudView?.resize();
+      lastLayers = "";
+    }, 160);
   });
 
-  // ---- the draggable comparison --------------------------------------------
-
-  function setSplit(fraction: number): void {
-    split = Math.min(Math.max(fraction, 0.02), 0.98);
-    cancelAnimationFrame(animation);
-    draw("texture", 1);
-  }
-
-  let dragging = false;
-  let touchStart: { x: number; y: number } | null = null;
-  const moveTo = (clientX: number) => {
-    const rect = drag.getBoundingClientRect();
-    setSplit((clientX - rect.left) / rect.width);
-  };
-  drag.addEventListener("pointerdown", (event) => {
-    if (event.pointerType === "mouse") {
-      dragging = true;
-      drag.setPointerCapture(event.pointerId);
-      moveTo(event.clientX);
-    } else {
-      // A finger may be starting a scroll: wait to see which way it goes.
-      touchStart = { x: event.clientX, y: event.clientY };
-    }
-  });
-  drag.addEventListener("pointermove", (event) => {
-    if (dragging) {
-      moveTo(event.clientX);
-      return;
-    }
-    if (!touchStart) {
-      return;
-    }
-    const dx = Math.abs(event.clientX - touchStart.x);
-    const dy = Math.abs(event.clientY - touchStart.y);
-    if (dx > 8 && dx > dy) {
-      dragging = true;
-      touchStart = null;
-      drag.setPointerCapture(event.pointerId);
-      moveTo(event.clientX);
-    } else if (dy > 8) {
-      touchStart = null;
-    }
-  });
-  drag.addEventListener("pointerup", (event) => {
-    // A tap without a swipe moves the divider to where it landed.
-    if (touchStart) {
-      moveTo(event.clientX);
-    }
-    dragging = false;
-    touchStart = null;
-  });
-  drag.addEventListener("pointercancel", () => {
-    dragging = false;
-    touchStart = null;
-  });
-  drag.addEventListener("keydown", (event) => {
-    const step = event.shiftKey ? 0.1 : 0.04;
-    if (event.key === "ArrowLeft") {
-      setSplit(split - step);
-    } else if (event.key === "ArrowRight") {
-      setSplit(split + step);
-    } else if (event.key === "Home") {
-      setSplit(0);
-    } else if (event.key === "End") {
-      setSplit(1);
-    } else {
-      return;
-    }
-    event.preventDefault();
-  });
-
-  let lookTimer = 0;
   return {
     setScene(next) {
       scene = next;
-      layers = null;
-      whenIdle(() => void build());
-    },
-    setLook(next) {
-      current = mixLook(next, next, 1);
-      // A slider drag sends a look per pixel moved; the last chapter only
-      // needs the one the reader lets go on.
-      window.clearTimeout(lookTimer);
-      lookTimer = window.setTimeout(() => {
-        if (!scene || !layers) {
-          return;
-        }
-        const madeFull = rendered(scene, current) ?? scene.source;
-        const l = layers;
-        const box = scene.face;
-        const aspect = l.width / l.height;
-        const face = cropAround(
-          box.cx,
-          box.cy,
-          Math.max(box.width * 1.32, box.height * 1.32 * aspect),
-          aspect,
-          scene,
-        );
-        l.made = crop(madeFull, face, l.width, l.height);
-        if (active === "final") {
-          cancelAnimationFrame(animation);
-        }
-        draw("final", 1);
-      }, 150);
+      whenIdle(build);
     },
   };
 }

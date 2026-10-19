@@ -1,42 +1,36 @@
 /**
- * The controls: a dock beside the mirror, and a drawer with every product.
+ * The shade bar: one strip of controls along the bottom of the mirror.
  *
- * The dock holds what most people reach for -- the four looks and the
- * lipstick range, drawn as lipstick bullets -- plus the mirror's own tools.
- * "All products" opens a drawer with the other five products, one at a
- * time behind tabs. On a wide screen the drawer slides in from the left,
- * over the text, so the face on the right stays in view while you work; on
- * a phone it rises from the bottom under the face.
+ * It works like a camera app's filter strip. A row of tabs -- Looks, then
+ * the six products -- picks what the strip below it shows: the four looks
+ * as small portraits of the face wearing them, or one product's range drawn
+ * as the thing you would buy (lipstick bullets, pressed-powder pans,
+ * pencils), with a None choice first, and beside it the shade's name, its
+ * intensity and, for lipstick, its finish.
  *
  * Every control edits one field of the `LookConfig` the mirror renders, and
  * nothing here trusts a copy of its own: it is handed the current look on
  * every refresh and redraws its selected states from it. That is what keeps
- * a look, a bullet, a tab's colour dot and a swatch from ever disagreeing
- * about which shade is on the face.
+ * a look, a tab's colour dot and a swatch from ever disagreeing about which
+ * shade is on the face.
  *
- * Switching a product off sets its intensity to zero (which is what the
- * engine reads), but the controls remember the intensity it had, so
- * switching back on returns you to your setting rather than to a default.
+ * Choosing None sets a product's intensity to zero (which is what the
+ * engine reads), but the bar remembers the intensity it had, so picking a
+ * shade again returns you to your setting rather than to a default.
  */
 
 import { PRESETS, type Finish, type LookConfig, type ProductName } from "../engine/look";
-import { ICONS } from "./icons";
 import { FINISHES, PRODUCTS, type ProductMeta } from "./shades";
 
-/** What changed, so the page can decide whether to blend or cut. Sliders
- * cut: a drag already moves continuously, and blending would make the face
- * lag behind the thumb. */
+/** What changed, so the page can decide whether to animate. Sliders cut: a
+ * drag already moves continuously, and a transition would trail the thumb. */
 export type Change = "look" | "shade" | "toggle" | "finish" | "intensity";
 
 export interface Controls {
-  dock: HTMLElement;
-  drawer: HTMLElement;
-  /** Where the mirror's tool buttons go, at the end of the dock. */
-  toolsSlot: HTMLElement;
+  element: HTMLElement;
   refresh(look: LookConfig): void;
-  /** Called when the drawer opens and whenever it switches product, so the
-   * page can bring that part of the face into view. */
-  onDrawerFocus(callback: (product: ProductName) => void): void;
+  /** Paints each look's portrait once the page has rendered them. */
+  setThumbnails(thumbnails: Record<string, CanvasImageSource>): void;
 }
 
 interface ControlsOptions {
@@ -44,14 +38,14 @@ interface ControlsOptions {
   onChange(look: LookConfig, change: Change): void;
 }
 
-interface LookMeta {
+export interface LookMeta {
   name: string;
   label: string;
   note: string;
 }
 
 /** Lightest to boldest, each with the line that tells them apart. */
-const LOOKS: LookMeta[] = [
+export const LOOKS: LookMeta[] = [
   { name: "bare", label: "Bare", note: "A tint on lips and brows" },
   { name: "everyday", label: "Everyday", note: "Soft colour all over" },
   { name: "velvet", label: "Velvet", note: "Deep matte lip and liner" },
@@ -68,6 +62,34 @@ const SWATCH_KIND: Record<ProductName, "bullet" | "pan" | "pencil"> = {
   highlighter: "pan",
 };
 
+/** The product's name as it reads in "No …". */
+const NONE_LABEL: Record<ProductName, string> = {
+  lipstick: "No lipstick",
+  eyeshadow: "No eyeshadow",
+  eyeliner: "No liner",
+  brows: "No brow tint",
+  blush: "No blush",
+  highlighter: "No highlighter",
+};
+
+const THUMB_SIZE = 112;
+
+/**
+ * How strongly a shade goes on when it is picked from the range, if the
+ * product is fainter than that. A range is for seeing shades side by side,
+ * and at a preset's light touch neighbouring reds look alike on the face.
+ * It never lowers a stronger setting, and never overrides a level the
+ * visitor chose with the slider.
+ */
+const PICK_FLOOR: Record<ProductName, number> = {
+  lipstick: 0.75,
+  eyeshadow: 0.45,
+  eyeliner: 0.7,
+  brows: 0.4,
+  blush: 0.35,
+  highlighter: 0.5,
+};
+
 function clone(look: LookConfig): LookConfig {
   return {
     lipstick: { ...look.lipstick },
@@ -80,7 +102,7 @@ function clone(look: LookConfig): LookConfig {
   };
 }
 
-function sameLook(a: LookConfig, b: LookConfig): boolean {
+export function sameLook(a: LookConfig, b: LookConfig): boolean {
   return PRODUCTS.every((product) => {
     const left = a[product.name];
     const right = b[product.name];
@@ -107,58 +129,116 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-function iconButton(className: string, label: string, icon: string): HTMLButtonElement {
-  const node = el("button", className);
-  node.type = "button";
-  node.innerHTML = `${icon}<span>${label}</span>`;
-  return node;
-}
-
 /** One shade, drawn as a bullet, a pressed pan or a pencil tip. */
-function swatch(kind: "bullet" | "pan" | "pencil", hex: string, name: string, className: string): HTMLButtonElement {
-  const node = el("button", `${className} ${className}--${kind}`);
+function swatch(kind: "bullet" | "pan" | "pencil", hex: string, name: string): HTMLButtonElement {
+  const node = el("button", `swatch swatch--${kind}`);
   node.type = "button";
   node.style.setProperty("--swatch", hex);
   node.title = name;
   node.setAttribute("aria-label", name);
   node.setAttribute("aria-pressed", "false");
   node.dataset.hex = hex;
-  const art = el("span", `${className}__art`);
+  const art = el("span", "swatch__art");
   art.setAttribute("aria-hidden", "true");
   node.append(art);
   return node;
+}
+
+/**
+ * Arrow keys move between the buttons of a row, and only one of them is in
+ * the tab order at a time: sixteen lipsticks are one stop for the keyboard,
+ * not sixteen.
+ */
+function rovingRow(row: HTMLElement, items: HTMLElement[]): (index: number) => void {
+  const setCurrent = (index: number) => {
+    items.forEach((item, i) => {
+      item.tabIndex = i === index ? 0 : -1;
+    });
+  };
+  row.addEventListener("keydown", (event) => {
+    const current = items.indexOf(document.activeElement as HTMLElement);
+    if (current < 0) {
+      return;
+    }
+    let next = current;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      next = Math.min(items.length - 1, current + 1);
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      next = Math.max(0, current - 1);
+    } else if (event.key === "Home") {
+      next = 0;
+    } else if (event.key === "End") {
+      next = items.length - 1;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    setCurrent(next);
+    items[next].focus();
+    items[next].scrollIntoView({ block: "nearest", inline: "nearest" });
+  });
+  setCurrent(0);
+  return setCurrent;
 }
 
 export function createControls(options: ControlsOptions): Controls {
   let look = clone(options.look);
   /** Intensity to restore when a product is switched back on. */
   const remembered = new Map<ProductName, number>();
-  const drawerListeners: Array<(product: ProductName) => void> = [];
+  /** Products whose intensity the visitor set with the slider. */
+  const chosenByHand = new Set<ProductName>();
 
   const emit = (change: Change) => {
     options.onChange(clone(look), change);
     refresh(look);
   };
 
-  function pickShade(meta: ProductMeta, hex: string): void {
-    look[meta.name].color = hex;
-    if (look[meta.name].intensity <= 0) {
-      look[meta.name].intensity = remembered.get(meta.name) ?? meta.defaultIntensity;
-    }
-    emit("shade");
+  const root = el("div", "bar");
+  root.setAttribute("role", "region");
+  root.setAttribute("aria-label", "Makeup");
+
+  const tabList = el("div", "bar__tabs");
+  tabList.setAttribute("role", "tablist");
+  tabList.setAttribute("aria-label", "Makeup");
+  const panels = el("div", "bar__panels");
+  root.append(tabList, panels);
+
+  interface Tab {
+    key: string;
+    tab: HTMLButtonElement;
+    panel: HTMLElement;
+  }
+  const tabs: Tab[] = [];
+  let selected = "looks";
+
+  function addTab(key: string, label: string, panel: HTMLElement): HTMLButtonElement {
+    const tab = el("button", "tab");
+    tab.type = "button";
+    tab.id = `tab-${key}`;
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-controls", `panel-${key}`);
+    panel.id = `panel-${key}`;
+    panel.setAttribute("role", "tabpanel");
+    panel.setAttribute("aria-labelledby", tab.id);
+    panel.tabIndex = -1;
+    const dot = el("span", "tab__dot");
+    dot.setAttribute("aria-hidden", "true");
+    tab.append(dot, el("span", "tab__label", label));
+    tab.addEventListener("click", () => select(key));
+    tabList.append(tab);
+    panels.append(panel);
+    tabs.push({ key, tab, panel });
+    return tab;
   }
 
-  // ---- the dock ---------------------------------------------------------
+  // ---- looks ------------------------------------------------------------
 
-  const dock = el("div", "dock");
-
-  const looksGroup = el("div", "dock__group");
-  const looksLabel = el("p", "dock__label", "Looks");
-  looksLabel.id = "looks-label";
-  const presetRow = el("div", "presets");
-  presetRow.setAttribute("role", "group");
-  presetRow.setAttribute("aria-labelledby", looksLabel.id);
-  const presetButtons: Array<{ name: string; node: HTMLButtonElement }> = [];
+  const looksPanel = el("div", "looks");
+  const looksRow = el("div", "looks__row");
+  looksRow.setAttribute("role", "group");
+  looksRow.setAttribute("aria-label", "Looks");
+  looksPanel.append(looksRow);
+  const presetButtons: Array<{ name: string; node: HTMLButtonElement; thumb: HTMLCanvasElement }> = [];
   for (const meta of LOOKS) {
     const preset = PRESETS[meta.name];
     if (!preset) {
@@ -168,139 +248,95 @@ export function createControls(options: ControlsOptions): Controls {
     node.type = "button";
     node.title = meta.note;
     node.setAttribute("aria-pressed", "false");
+    const frame = el("span", "preset__frame");
+    frame.setAttribute("aria-hidden", "true");
+    const thumb = el("canvas", "preset__thumb");
+    thumb.width = THUMB_SIZE;
+    thumb.height = THUMB_SIZE;
+    // Until the portraits are painted, the look's own shades stand in.
     const pans = el("span", "preset__pans");
-    pans.setAttribute("aria-hidden", "true");
     for (const product of PRODUCTS) {
-      if (preset[product.name].intensity <= 0) {
-        continue;
+      if (preset[product.name].intensity > 0) {
+        const pan = el("span");
+        pan.style.setProperty("--pan", preset[product.name].color);
+        pans.append(pan);
       }
-      const pan = el("span");
-      pan.style.setProperty("--pan", preset[product.name].color);
-      pans.append(pan);
     }
-    node.append(pans, el("span", "preset__name", meta.label));
+    frame.append(pans, thumb);
+    const words = el("span", "preset__words");
+    words.append(el("span", "preset__name", meta.label), el("span", "preset__note", meta.note));
+    node.append(frame, words);
     node.addEventListener("click", () => {
       look = clone(preset);
       remembered.clear();
+      chosenByHand.clear();
       emit("look");
     });
-    presetRow.append(node);
-    presetButtons.push({ name: meta.name, node });
+    looksRow.append(node);
+    presetButtons.push({ name: meta.name, node, thumb });
   }
-  looksGroup.append(looksLabel, presetRow);
+  rovingRow(looksRow, presetButtons.map((entry) => entry.node));
+  const looksTab = addTab("looks", "Looks", looksPanel);
+  looksTab.classList.add("tab--looks");
 
-  const lipstick = PRODUCTS.find((product) => product.name === "lipstick") as ProductMeta;
-  const lipsGroup = el("div", "dock__group");
-  const lipsLabel = el("p", "dock__label");
-  lipsLabel.id = "lips-label";
-  const lipsShade = el("span", "dock__shade");
-  lipsLabel.append("Lipstick", lipsShade);
-  const bulletRow = el("div", "bullets");
-  bulletRow.setAttribute("role", "group");
-  bulletRow.setAttribute("aria-labelledby", lipsLabel.id);
-  const bullets: HTMLButtonElement[] = [];
-  for (const shade of lipstick.shades) {
-    const node = swatch("bullet", shade.hex, shade.name, "bullet");
-    node.classList.remove("bullet--bullet");
-    node.addEventListener("click", () => pickShade(lipstick, shade.hex));
-    // Pointing at a bullet previews its name, so the range can be read
-    // without committing to anything.
-    const preview = () => {
-      lipsShade.textContent = shade.name;
-      lipsShade.dataset.preview = "true";
-    };
-    node.addEventListener("pointerenter", preview);
-    node.addEventListener("focus", preview);
-    node.addEventListener("pointerleave", () => refresh(look));
-    node.addEventListener("blur", () => refresh(look));
-    bulletRow.append(node);
-    bullets.push(node);
-  }
-  lipsGroup.append(lipsLabel, bulletRow);
-
-  const actions = el("div", "dock__actions");
-  const studioBtn = iconButton("dock__studio", "All products", ICONS.sliders);
-  studioBtn.setAttribute("aria-expanded", "false");
-  studioBtn.setAttribute("aria-controls", "studio");
-  const toolsSlot = el("div", "dock__tools");
-  actions.append(studioBtn, toolsSlot);
-
-  dock.append(looksGroup, lipsGroup, actions);
-
-  // ---- the drawer ---------------------------------------------------------
-
-  const drawer = el("div", "studio-layer");
-  drawer.dataset.open = "false";
-  const panel = el("aside", "studio");
-  panel.id = "studio";
-  panel.setAttribute("aria-labelledby", "studio-title");
-  panel.inert = true;
-
-  const head = el("div", "studio__head");
-  const title = el("h2", "studio__title", "Every product");
-  title.id = "studio-title";
-  const closeBtn = el("button", "studio__close");
-  closeBtn.type = "button";
-  closeBtn.innerHTML = ICONS.close;
-  closeBtn.setAttribute("aria-label", "Close every product");
-  head.append(title, closeBtn);
-
-  const tabList = el("div", "tabs");
-  tabList.setAttribute("role", "tablist");
-  tabList.setAttribute("aria-labelledby", title.id);
-  panel.append(head, tabList);
+  // ---- products -----------------------------------------------------------
 
   interface ProductControls {
     meta: ProductMeta;
     tab: HTMLButtonElement;
-    tabDot: HTMLElement;
     panel: HTMLElement;
-    toggle: HTMLButtonElement;
+    none: HTMLButtonElement;
     shadeName: HTMLElement;
     swatches: HTMLButtonElement[];
+    focusShade: (index: number) => void;
     slider: HTMLInputElement;
     sliderValue: HTMLOutputElement;
     finishButtons: Array<{ value: Finish; node: HTMLButtonElement }>;
   }
-
   const controls: ProductControls[] = [];
-  let selected: ProductName = PRODUCTS[0].name;
 
   for (const meta of PRODUCTS) {
-    const tab = el("button", "tab");
-    tab.type = "button";
-    tab.id = `tab-${meta.name}`;
-    tab.setAttribute("role", "tab");
-    tab.setAttribute("aria-controls", `panel-${meta.name}`);
-    const tabDot = el("span", "tab__dot");
-    tabDot.setAttribute("aria-hidden", "true");
-    tab.append(tabDot, el("span", "tab__label", meta.label));
-    tabList.append(tab);
+    const panel = el("div", "product");
+    panel.dataset.product = meta.name;
 
-    const section = el("div", "product");
-    section.id = `panel-${meta.name}`;
-    section.dataset.product = meta.name;
-    section.setAttribute("role", "tabpanel");
-    section.setAttribute("aria-labelledby", tab.id);
-    section.tabIndex = -1;
+    const row = el("div", `product__shades product__shades--${SWATCH_KIND[meta.name]}`);
+    row.setAttribute("role", "group");
+    row.setAttribute("aria-label", `${meta.label} shades`);
 
-    const productHead = el("div", "product__head");
+    const none = el("button", "none");
+    none.type = "button";
+    none.title = NONE_LABEL[meta.name];
+    none.setAttribute("aria-label", NONE_LABEL[meta.name]);
+    none.setAttribute("aria-pressed", "false");
+    none.addEventListener("click", () => {
+      if (look[meta.name].intensity > 0) {
+        remembered.set(meta.name, look[meta.name].intensity);
+        look[meta.name].intensity = 0;
+        emit("toggle");
+      }
+    });
+    row.append(none);
+
+    const side = el("div", "product__side");
     const shadeName = el("p", "product__shade");
     shadeName.setAttribute("aria-live", "polite");
-    const toggle = el("button", "switch");
-    toggle.type = "button";
-    toggle.setAttribute("role", "switch");
-    toggle.setAttribute("aria-checked", "false");
-    toggle.setAttribute("aria-label", `Wear ${meta.label.toLowerCase()}`);
-    productHead.append(shadeName, toggle);
 
-    const swatchRow = el("div", `swatches swatches--${SWATCH_KIND[meta.name]}`);
-    swatchRow.setAttribute("role", "group");
-    swatchRow.setAttribute("aria-label", `${meta.label} shades`);
     const swatches: HTMLButtonElement[] = [];
     for (const shade of meta.shades) {
-      const node = swatch(SWATCH_KIND[meta.name], shade.hex, shade.name, "swatch");
-      node.addEventListener("click", () => pickShade(meta, shade.hex));
+      const node = swatch(SWATCH_KIND[meta.name], shade.hex, shade.name);
+      node.addEventListener("click", () => {
+        const product = look[meta.name];
+        product.color = shade.hex;
+        if (product.intensity <= 0) {
+          product.intensity = remembered.get(meta.name) ?? meta.defaultIntensity;
+        }
+        if (!chosenByHand.has(meta.name)) {
+          product.intensity = Math.max(product.intensity, PICK_FLOOR[meta.name]);
+        }
+        emit("shade");
+      });
+      // Pointing at a shade previews its name where the worn shade's name
+      // sits, so the range can be read without committing to anything.
       const preview = () => {
         shadeName.dataset.preview = "true";
         shadeName.textContent = shade.name;
@@ -309,9 +345,10 @@ export function createControls(options: ControlsOptions): Controls {
       node.addEventListener("focus", preview);
       node.addEventListener("pointerleave", () => refresh(look));
       node.addEventListener("blur", () => refresh(look));
-      swatchRow.append(node);
+      row.append(node);
       swatches.push(node);
     }
+    const focusShade = rovingRow(row, [none, ...swatches]);
 
     const sliderRow = el("div", "slider");
     const sliderId = `intensity-${meta.name}`;
@@ -327,6 +364,7 @@ export function createControls(options: ControlsOptions): Controls {
     sliderValue.htmlFor.add(sliderId);
     slider.addEventListener("input", () => {
       const value = Number(slider.value) / 100;
+      chosenByHand.add(meta.name);
       look[meta.name].intensity = value;
       if (value > 0) {
         remembered.set(meta.name, value);
@@ -335,8 +373,7 @@ export function createControls(options: ControlsOptions): Controls {
     });
     sliderRow.append(sliderLabel, slider, sliderValue);
 
-    section.append(productHead, swatchRow, sliderRow);
-
+    side.append(shadeName);
     const finishButtons: Array<{ value: Finish; node: HTMLButtonElement }> = [];
     if (meta.hasFinish) {
       const segmented = el("div", "segmented");
@@ -354,104 +391,58 @@ export function createControls(options: ControlsOptions): Controls {
         segmented.append(node);
         finishButtons.push({ value: finish.value, node });
       }
-      section.append(segmented);
+      side.append(segmented);
     }
+    side.append(sliderRow);
+    panel.append(row, side);
 
-    section.append(el("p", "product__blurb", meta.blurb));
-
-    toggle.addEventListener("click", () => {
-      const on = look[meta.name].intensity > 0;
-      if (on) {
-        remembered.set(meta.name, look[meta.name].intensity);
-        look[meta.name].intensity = 0;
-      } else {
-        look[meta.name].intensity = remembered.get(meta.name) ?? meta.defaultIntensity;
-      }
-      emit("toggle");
-    });
-
-    tab.addEventListener("click", () => select(meta.name));
-    panel.append(section);
+    const tab = addTab(meta.name, meta.label, panel);
     controls.push({
       meta,
       tab,
-      tabDot,
-      panel: section,
-      toggle,
+      panel,
+      none,
       shadeName,
       swatches,
+      focusShade,
       slider,
       sliderValue,
       finishButtons,
     });
   }
 
-  panel.append(el("p", "studio__note", "Every change shows on the mirror as you make it."));
-  drawer.append(panel);
-
-  function select(name: ProductName, focusTab = false): void {
-    const changed = name !== selected;
-    selected = name;
-    for (const control of controls) {
-      const active = control.meta.name === name;
-      control.tab.setAttribute("aria-selected", String(active));
-      control.tab.tabIndex = active ? 0 : -1;
-      control.panel.hidden = !active;
+  function select(key: string, focusTab = false): void {
+    selected = key;
+    for (const entry of tabs) {
+      const active = entry.key === key;
+      entry.tab.setAttribute("aria-selected", String(active));
+      entry.tab.tabIndex = active ? 0 : -1;
+      entry.panel.hidden = !active;
       if (active && focusTab) {
-        control.tab.focus();
+        entry.tab.focus();
       }
     }
-    if (changed && drawer.dataset.open === "true") {
-      for (const listener of drawerListeners) {
-        listener(name);
-      }
-    }
+    root.dataset.tab = key;
   }
 
   // Arrow keys move between tabs, as the tab pattern promises; selection
   // follows focus, since showing a panel costs nothing.
   tabList.addEventListener("keydown", (event) => {
-    const index = controls.findIndex((control) => control.meta.name === selected);
+    const index = tabs.findIndex((entry) => entry.key === selected);
     let next = index;
     if (event.key === "ArrowRight") {
-      next = (index + 1) % controls.length;
+      next = (index + 1) % tabs.length;
     } else if (event.key === "ArrowLeft") {
-      next = (index - 1 + controls.length) % controls.length;
+      next = (index - 1 + tabs.length) % tabs.length;
     } else if (event.key === "Home") {
       next = 0;
     } else if (event.key === "End") {
-      next = controls.length - 1;
+      next = tabs.length - 1;
     } else {
       return;
     }
     event.preventDefault();
-    select(controls[next].meta.name, true);
-  });
-
-  // The drawer does not block the page: the mirror stays live beside it,
-  // so it is a panel rather than a modal dialog. Closed, it is inert --
-  // out of the tab order and out of reach of assistive technology.
-  function setOpen(open: boolean): void {
-    drawer.dataset.open = String(open);
-    panel.inert = !open;
-    studioBtn.setAttribute("aria-expanded", String(open));
-    if (open) {
-      for (const listener of drawerListeners) {
-        listener(selected);
-      }
-      const active = controls.find((control) => control.meta.name === selected);
-      active?.tab.focus({ preventScroll: true });
-    } else if (panel.contains(document.activeElement)) {
-      studioBtn.focus({ preventScroll: true });
-    }
-  }
-
-  studioBtn.addEventListener("click", () => setOpen(drawer.dataset.open !== "true"));
-  closeBtn.addEventListener("click", () => setOpen(false));
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && drawer.dataset.open === "true") {
-      setOpen(false);
-    }
+    select(tabs[next].key, true);
   });
 
   // ---- keeping every control honest --------------------------------------
@@ -463,41 +454,28 @@ export function createControls(options: ControlsOptions): Controls {
       node.setAttribute("aria-pressed", String(sameLook(look, PRESETS[name])));
     }
 
-    const lips = look.lipstick;
-    const lipsOn = lips.intensity > 0;
-    for (const bullet of bullets) {
-      bullet.setAttribute(
-        "aria-pressed",
-        String(lipsOn && bullet.dataset.hex?.toLowerCase() === lips.color.toLowerCase()),
-      );
-    }
-    delete lipsShade.dataset.preview;
-    lipsShade.textContent = lipsOn
-      ? (lipstick.shades.find((s) => s.hex.toLowerCase() === lips.color.toLowerCase())?.name ?? lips.color)
-      : "off";
-
     for (const control of controls) {
       const product = look[control.meta.name];
       const on = product.intensity > 0;
-      const shade = control.meta.shades.find(
+      const shadeIndex = control.meta.shades.findIndex(
         (s) => s.hex.toLowerCase() === product.color.toLowerCase(),
       );
-      const name = shade?.name ?? product.color;
+      const name = shadeIndex >= 0 ? control.meta.shades[shadeIndex].name : product.color;
 
       control.panel.dataset.on = String(on);
       control.panel.style.setProperty("--product", product.color);
       control.tab.dataset.on = String(on);
-      control.tabDot.style.setProperty("--dot", product.color);
-      control.tab.setAttribute("aria-label", `${control.meta.label}: ${on ? name : "off"}`);
-      control.toggle.setAttribute("aria-checked", String(on));
+      control.tab.style.setProperty("--dot", product.color);
+      control.tab.setAttribute("aria-label", `${control.meta.label}: ${on ? name : "none"}`);
+      control.none.setAttribute("aria-pressed", String(!on));
       delete control.shadeName.dataset.preview;
-      control.shadeName.textContent = on ? name : `${control.meta.label} off`;
-
-      for (const node of control.swatches) {
-        node.setAttribute(
-          "aria-pressed",
-          String(node.dataset.hex?.toLowerCase() === product.color.toLowerCase()),
-        );
+      control.shadeName.textContent = on ? name : NONE_LABEL[control.meta.name];
+      control.swatches.forEach((node, i) => {
+        node.setAttribute("aria-pressed", String(on && i === shadeIndex));
+      });
+      // The keyboard lands on what is worn.
+      if (!control.panel.contains(document.activeElement)) {
+        control.focusShade(on && shadeIndex >= 0 ? shadeIndex + 1 : 0);
       }
       const percent = Math.round(product.intensity * 100);
       control.slider.value = String(percent);
@@ -513,12 +491,18 @@ export function createControls(options: ControlsOptions): Controls {
   refresh(options.look);
 
   return {
-    dock,
-    drawer,
-    toolsSlot,
+    element: root,
     refresh,
-    onDrawerFocus(callback) {
-      drawerListeners.push(callback);
+    setThumbnails(thumbnails) {
+      for (const { name, node, thumb } of presetButtons) {
+        const source = thumbnails[name];
+        const ctx = thumb.getContext("2d");
+        if (!source || !ctx) {
+          continue;
+        }
+        ctx.drawImage(source, 0, 0, thumb.width, thumb.height);
+        node.classList.add("preset--painted");
+      }
     },
   };
 }

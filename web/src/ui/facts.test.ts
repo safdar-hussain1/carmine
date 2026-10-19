@@ -28,4 +28,11 @@ describe("published facts", () => {
   it("names the machine the frame cost was measured on", () => {
     expect(FACTS.gpu).toBe("Apple M1 Pro");
   });
+
+  it("splits the frame into its three stages, which add up to the whole", () => {
+    expect(oneDecimal(FACTS.detectMs)).toBe("17.5");
+    expect(oneDecimal(FACTS.masksMs)).toBe("7.3");
+    expect(oneDecimal(FACTS.drawMs)).toBe("1.8");
+    expect(FACTS.detectMs + FACTS.masksMs + FACTS.drawMs).toBeCloseTo(FACTS.frameMs, 1);
+  });
 });

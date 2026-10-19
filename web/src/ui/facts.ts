@@ -32,6 +32,7 @@ function gpuName(renderer: string): string {
 }
 
 const frameMs = hardware.timing.livePath.totalMedian;
+const live = hardware.timing.livePath;
 
 export const FACTS = {
   /** Points the face landmark model returns per frame. */
@@ -46,6 +47,11 @@ export const FACTS = {
   frameMs,
   /** The frame rate that cost allows. */
   fps: 1000 / frameMs,
+  /** The three stages of that frame: finding the face, building the live
+   * masks, and the one paint pass. Medians, so they add up only roughly. */
+  detectMs: hardware.timing.detect.median,
+  masksMs: live.buildMasks.median,
+  drawMs: live.draw.median,
   /** The machine that measurement ran on. */
   gpu: gpuName(hardware.glRenderer),
 } as const;

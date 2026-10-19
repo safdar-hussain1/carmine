@@ -1,18 +1,20 @@
 /**
  * Page assembly.
  *
- * One place owns the look; the mirror renders it, the controls edit it, and
- * the story's last chapter shows it. Each is handed a copy on every change,
- * so none can mutate another's state behind its back.
+ * One place owns the look; the mirror renders it and the shade bar edits it.
+ * Each is handed a copy on every change, so neither can mutate the other's
+ * state behind its back. The lookbook and the story paint the sample on
+ * their own, from the same scene the mirror built.
  *
- * The page's accent follows the lipstick on the face: the giant masthead,
- * the glow around the picture, the wordmark's dot and the active controls
- * all take that shade, and a highlight sweeps across the masthead each time
- * it changes, so the page answers each choice as visibly as the mirror does.
+ * The page's accent follows the lipstick on the face: the light around the
+ * studio screen, the wordmark's dot and the active controls all take that
+ * shade, so the page answers each choice as visibly as the mirror does.
  */
 
-import { PRESETS, type LookConfig, type ProductName } from "../engine/look";
+import { animate, stagger } from "motion";
+import { PRESETS, type LookConfig } from "../engine/look";
 import { createControls, type Change } from "./controls";
+import { createLookbook } from "./lookbook";
 import { createMirror } from "./mirror";
 import { shellHtml } from "./sections";
 import { createStory } from "./story";
@@ -30,43 +32,65 @@ function startingLook(): LookConfig {
   return JSON.parse(JSON.stringify(preset)) as LookConfig;
 }
 
+function prefersReducedMotion(): boolean {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+}
+
 /**
- * Whether the sample runs without being asked. It costs the face model and
- * its runtime, about 15 MB, so it waits for a click when the reader has
- * asked the browser to save data or the connection is 2G-slow -- and never
- * during the selftest, whose timing check must not share the page with a
- * second render loop. A "3g" estimate is not enough on its own: Chrome
- * derives it mostly from round-trip time, so a fast link with high latency
- * is labelled 3g too.
+ * Whether the sample plays without being asked. It costs nothing to
+ * download beyond the page itself -- its landmarks ship with the page -- so
+ * it always does, except during the selftest, whose timing check must not
+ * share the page with an animation.
  */
 function shouldAutostart(): boolean {
-  if (new URLSearchParams(window.location.search).get("selftest") === "1") {
-    return false;
-  }
-  const connection = (navigator as Navigator & {
-    connection?: { saveData?: boolean; effectiveType?: string };
-  }).connection;
-  if (connection?.saveData) {
-    return false;
-  }
-  return !/^(slow-2g|2g)$/.test(connection?.effectiveType ?? "");
+  return new URLSearchParams(window.location.search).get("selftest") !== "1";
 }
 
 export function mountApp(root: HTMLElement): void {
   let look = startingLook();
 
   // The build writes the whole page into index.html, so it is usually on
-  // screen already, entrance animations running. It is kept, not drawn
-  // again: only the live parts are slotted into it, so nothing blinks or
-  // replays when the script arrives late on a slow connection.
+  // screen already. It is kept, not drawn again: only the live parts are
+  // slotted into it, so nothing blinks when the script arrives.
   if (!root.querySelector(".hero")) {
     root.innerHTML = shellHtml();
   }
-  const placeholderStage = root.querySelector<HTMLElement>(".hero__stage .stage");
+  const placeholderStage = root.querySelector<HTMLElement>(".screen__media .stage");
   const poster = placeholderStage?.querySelector<HTMLImageElement>(".stage__poster") ?? null;
 
   const storySection = root.querySelector<HTMLElement>("#how");
-  const story = storySection ? createStory(storySection, look) : null;
+  const story = storySection ? createStory(storySection) : null;
+
+  let controls: ReturnType<typeof createControls> | null = null;
+  const lookbookSection = root.querySelector<HTMLElement>("#looks");
+  const lookbook = lookbookSection
+    ? createLookbook(lookbookSection, (name) => {
+        const preset = PRESETS[name];
+        if (!preset) {
+          return;
+        }
+        look = JSON.parse(JSON.stringify(preset)) as LookConfig;
+        controls?.refresh(look);
+        setAccent(look);
+        root.querySelector(".hero")?.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth" });
+        // The sweep plays once the mirror is back on screen.
+        window.setTimeout(() => mirror.setLook(look, true), prefersReducedMotion() ? 0 : 450);
+      })
+    : null;
+
+  // On a phone the buttons sit below the screen, so a camera or a photo
+  // could start out of sight; bring the screen back unless most of it shows.
+  const revealScreen = () => {
+    const screen = root.querySelector<HTMLElement>(".screen");
+    if (!screen) {
+      return;
+    }
+    const rect = screen.getBoundingClientRect();
+    const showing = Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0);
+    if (showing < rect.height * 0.6) {
+      screen.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
+    }
+  };
 
   const mirror = createMirror({
     look,
@@ -74,6 +98,12 @@ export function mountApp(root: HTMLElement): void {
     autostart: shouldAutostart(),
     onSampleReady(scene) {
       story?.setScene(scene);
+      // The four looks are painted once and shared by the lookbook and the
+      // thumbnails in the shade bar.
+      const thumbs = lookbook?.render(scene);
+      if (thumbs) {
+        controls?.setThumbnails(thumbs);
+      }
     },
     onSourceChange(source) {
       root.querySelectorAll<HTMLButtonElement>("[data-action]").forEach((node) => {
@@ -82,71 +112,50 @@ export function mountApp(root: HTMLElement): void {
           (node.dataset.action === "photo" && source === "photo");
         node.dataset.active = String(pressed);
       });
+      if (source !== "sample") {
+        revealScreen();
+      }
     },
   });
 
-  const masthead = root.querySelector<HTMLElement>(".masthead");
   let accent = "";
   const setAccent = (next: LookConfig) => {
     const shade = next.lipstick.intensity > 0 ? next.lipstick.color : CARMINE;
-    if (shade === accent) {
-      return;
+    if (shade !== accent) {
+      accent = shade;
+      document.documentElement.style.setProperty("--shade", shade);
     }
-    accent = shade;
-    document.documentElement.style.setProperty("--shade", shade);
-    masthead?.classList.toggle("is-swept");
   };
 
-  const controls = createControls({
+  controls = createControls({
     look,
     onChange(next: LookConfig, change: Change) {
       look = next;
       mirror.setLook(next, change !== "intensity");
-      story?.setLook(next);
       setAccent(next);
     },
   });
 
   placeholderStage?.replaceWith(mirror.stage);
-  root.querySelector(".dock--pending")?.replaceWith(controls.dock);
-  root.append(controls.drawer);
-  controls.toolsSlot.append(mirror.tools);
+  root.querySelector(".tools--pending")?.replaceWith(mirror.tools);
+  root.querySelector(".bar--pending")?.replaceWith(controls.element);
 
-  // On a stacked layout the drawer rises over the lower half of the screen.
-  // Scroll so the part of the face being edited -- lips, eyes, cheeks --
-  // sits in the strip still visible above it.
-  const stacked = window.matchMedia?.("(max-width: 74.99rem)");
+  const cameraButton = root.querySelector<HTMLButtonElement>('[data-action="camera"]');
+  const photoButton = root.querySelector<HTMLButtonElement>('[data-action="photo"]');
+  cameraButton?.addEventListener("click", () => mirror.useCamera());
+  photoButton?.addEventListener("click", () => mirror.choosePhoto());
+  // Reaching for either button starts the face model downloading, so the
+  // camera or the photo is ready sooner when the click lands.
+  for (const button of [cameraButton, photoButton]) {
+    button?.addEventListener("pointerenter", () => mirror.warmUp(), { once: true });
+    button?.addEventListener("focus", () => mirror.warmUp(), { once: true });
+  }
+
+  // The masthead floats over the page; once it scrolls it settles onto a
+  // solid bar so the links stay readable over the sections below.
   const header = root.querySelector<HTMLElement>(".site-header");
-  controls.onDrawerFocus((product: ProductName) => {
-    if (!stacked?.matches) {
-      return;
-    }
-    requestAnimationFrame(() => {
-      const sheet = root.querySelector<HTMLElement>(".studio");
-      const featureY = mirror.featureY(product);
-      if (!sheet || featureY === null) {
-        root.querySelector(".hero")?.scrollIntoView({ block: "start", behavior: "smooth" });
-        return;
-      }
-      const top = header?.getBoundingClientRect().height ?? 0;
-      const bottom = window.innerHeight - sheet.getBoundingClientRect().height;
-      const stageTop = mirror.stage.getBoundingClientRect().top + window.scrollY;
-      const target = stageTop + featureY - (top + (bottom - top) * 0.55);
-      window.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
-    });
-  });
-
-  root.querySelector<HTMLButtonElement>('[data-action="camera"]')?.addEventListener("click", () => {
-    mirror.useCamera();
-  });
-  root.querySelector<HTMLButtonElement>('[data-action="photo"]')?.addEventListener("click", () => {
-    mirror.choosePhoto();
-  });
-
-  // The masthead floats over the hero; once the page scrolls it settles
-  // onto a solid bar so the links stay readable over the sections below.
   const onScroll = () => {
-    header?.classList.toggle("is-scrolled", window.scrollY > 24);
+    header?.classList.toggle("is-scrolled", window.scrollY > 16);
   };
   window.addEventListener("scroll", onScroll, { passive: true });
   onScroll();
@@ -157,4 +166,13 @@ export function mountApp(root: HTMLElement): void {
   }
 
   setAccent(look);
+
+  // One entrance for the screen's furniture, while the face assembles
+  // behind it: the headline and buttons rise in, then the shade bar.
+  if (!prefersReducedMotion()) {
+    const copy = root.querySelectorAll(".hero__copy > *");
+    animate(copy, { opacity: [0, 1], y: [18, 0] }, { duration: 0.9, delay: stagger(0.08, { startDelay: 0.25 }), ease: [0.22, 1, 0.36, 1] });
+    animate(controls.element, { opacity: [0, 1], y: [24, 0] }, { duration: 0.9, delay: 0.7, ease: [0.22, 1, 0.36, 1] });
+    animate(mirror.tools, { opacity: [0, 1] }, { duration: 0.8, delay: 0.9 });
+  }
 }

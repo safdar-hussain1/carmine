@@ -38,6 +38,14 @@ describe("focusOn", () => {
     expect(focusOn(400, 500, 1600, 1000, 10, 500).fx).toBe(0);
   });
 
+  it("aims the point at any spot in the box, not only the middle", () => {
+    // Drawn 800 wide in a 400 box: point 1000 is drawn at 500; to land it
+    // at 70% of the box (280) the picture moves by -220 of -400.
+    const focus = focusOn(400, 500, 1600, 1000, 1000, 500, 0.7);
+    const fit = coverFit(400, 500, 1600, 1000, focus.fx, focus.fy);
+    expect(contentToBox(fit, 1000, 500)[0]).toBeCloseTo(280, 9);
+  });
+
   it("puts the centred point back at the box centre", () => {
     const focus = focusOn(400, 500, 1600, 1000, 900, 500);
     const fit = coverFit(400, 500, 1600, 1000, focus.fx, focus.fy);

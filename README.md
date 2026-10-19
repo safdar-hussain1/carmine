@@ -255,8 +255,8 @@ carmine landmarks IN.jpg OUT.jpg                 # the 478 detected points as do
 python -c "import cv2; from carmine import apply_look, PRESETS; cv2.imwrite('out.jpg', apply_look(cv2.imread('web/public/demo/model.jpg'), PRESETS['velvet']))"
 
 # --- tests ---------------------------------------------------------------------------
-pytest                                           # 257 tests; the 5 that need the private dataset skip without it
-(cd web && npx vitest run)                       # 76 tests of the browser engine
+pytest                                           # 259 tests; the 5 that need the private dataset skip without it
+(cd web && npx vitest run)                       # 118 tests: the browser engine and the page's geometry
 (cd web && npx tsc --noEmit)                     # type-check
 python scripts/verify_site.py                    # the built site's own selftest, 9 checks, in headless Chrome
 python scripts/verify_site.py --url 'https://safdar-hussain1.github.io/carmine/?selftest=1'   # ... on the live site
@@ -270,6 +270,7 @@ python3 -m http.server 8000 --directory docs     # the built site at http://loca
 # --- regenerate what the repository commits (see the table below first) --------------
 python scripts/export_constants.py               # web/src/gen/constants.json, from the Python source
 python scripts/export_test_vectors.py            # web/src/gen/test_vectors.json, from the Python engine
+python scripts/export_sample_landmarks.py        # web/src/gen/sample_landmarks.json, the sample portrait's 478 points
 python scripts/make_figures.py                   # reports/figures/: benchmark_metrics, presets_demo, opacity_compare
 python scripts/preview_masks.py                  # reports/figures/masks_demo.png
 python scripts/make_demo_portrait.py             # web/public/demo/portrait.jpg, the selftest's fixed frame
@@ -288,9 +289,9 @@ turns the count check off). `build_notebook.py` takes `--kernel NAME` (default
 `python3`); `make_og_image.py` takes `--theme light|dark` (default dark) and `--out PATH`.
 
 **Why the built site needs a server.** `docs/index.html` loads its script as an
-ES module and its stylesheet with `crossorigin`, and fetches the sample portrait,
-the face model and the wasm runtime as soon as it opens. Browsers refuse all of that from a
-`file://` page, so opening the file directly shows an unstyled headline and
+ES module and its stylesheet with `crossorigin`, fetches the sample portrait as
+it opens, and fetches the face model and the wasm runtime when the camera or a
+photo needs them. Browsers refuse all of that from a `file://` page, so opening the file directly shows an unstyled headline and
 nothing else. Any static server works; the one above ships with Python.
 
 **Commands that rewrite committed files.** Most of the list above is safe to
@@ -308,8 +309,10 @@ committed, and some tests read that output:
 | `scripts/make_og_image.py` | `web/public/og-image.png`, a fresh screenshot every run |
 
 `git checkout -- <path>` puts any of them back. Everything else in the list
-reproduces the committed bytes: the two generated JSON files (the tests check
-those), the mask preview, the demo portrait and the built site.
+reproduces what is committed: the three generated JSON files (the tests check
+those; the sample's landmarks to within two pixels, because the face model's
+arithmetic differs slightly between CPUs), the mask preview, the demo portrait
+and the built site.
 
 ## The mirror
 
@@ -320,14 +323,16 @@ products composite in a single fragment pass — no intermediate buffers, which
 on a phone would cost more than every colour operation combined.
 
 **Privacy is a claim about network traffic, so it is checkable.** The landmark
-model, the wasm runtime and the one web font are served from the same origin
+model, the wasm runtime and the display typeface (an upright and an italic file) are served from the same origin
 instead of a CDN, and there are no analytics: every request the page makes goes
-to its own site. It loads the sample portrait and the model as soon as it opens
-(when the browser asks to save data, or the connection is 2G-slow, the demo waits
-for a click instead), and once the model has loaded it makes **no** further
-requests. Open the Network panel, reload, let the mirror settle, then change
-shades, open the camera and save a photo: the list stops growing. Or turn the
-network off once the mirror is running and keep using it. Saved photos go
+to its own site. It opens on the sample portrait, whose 478 landmarks ship inside
+the page, so the demo plays without the model. The model and the wasm runtime
+(about 16 MB together) are fetched when you turn on the camera or open a photo,
+or as soon as you point at one of those buttons, and once they have loaded the
+page makes **no** further requests. Open the Network panel, reload, open the
+camera once, then change shades, go back to the sample and save a photo: the
+list stops growing. Or turn the network off once the camera is running and keep
+using it. Saved photos go
 through your own browser's download; nothing is written anywhere else.
 
 The built site carries its own acceptance test. Load it with `?selftest=1` and
@@ -350,15 +355,15 @@ src/carmine/          the engine: landmarks, regions, masks, pigment, look, engi
                       plus baselines.py (failure modes) and metrics.py (scorers)
 web/index.html        the page template: head, search and link-preview metadata
 web/src/engine/       the browser port: masks, pigment, colour, blur, look, renderer
-web/src/ui/           the page: mirror, dock and product drawer, scroll story, pipeline
+web/src/ui/           the page: mirror, shade bar, lookbook, scroll story, pipeline
 web/src/lib/          landmarker, camera, selftest, parity and timing harnesses
-web/src/gen/          constants.json + test_vectors.json, generated from Python
+web/src/gen/          constants.json, test_vectors.json, sample_landmarks.json, generated from Python
 web/public/           bundled model and wasm, demo portraits, favicon, og-image,
                       sitemap, DESIGN_CARD, ARCHITECTURE
 scripts/              benchmark, stability_bench, figures, mask preview, demo portrait,
-                      constants/vector/fixture export, verify_site (headless browser),
+                      constants/vector/fixture/sample-landmark export, verify_site (headless browser),
                       build_notebook, mutation_battery, make_og_image
-tests/                257 pytest tests
+tests/                259 pytest tests
 notebooks/            the executed engineering write-up
 reports/              benchmark.json, browser_metrics.json, figures/
 docs/                 the built site (GitHub Pages)
@@ -370,14 +375,15 @@ docs/                 the built site (GitHub Pages)
 **Python** 3.10–3.14 · NumPy · OpenCV · MediaPipe Tasks · scikit-image
 (metrics, demo portrait) · pytest.
 **Web** TypeScript · Vite · WebGL2 (one fragment pass) ·
-`@mediapipe/tasks-vision` wasm · vitest. No UI framework, no CSS framework, no
-runtime dependency beyond the landmarker.
+`@mediapipe/tasks-vision` wasm · Motion (the page's animations) · vitest. No UI
+framework, no CSS framework, and no runtime dependency beyond the landmarker and
+Motion.
 
 ## Tests
 
 ```bash
-pytest                                  # 257 tests
-(cd web && npx vitest run)              # 76 tests
+pytest                                  # 259 tests
+(cd web && npx vitest run)              # 118 tests
 python scripts/verify_site.py           # headless browser selftest, 9 checks
 ```
 
@@ -386,7 +392,7 @@ every push and pull request to `main`: `pytest` on Python 3.12 and 3.13, and a
 web job that runs `npm ci`, vitest, the type-check and the production build,
 then fails if the build differs from the committed `docs/`. Two things it does
 not run: the five parity-fixture tests, which render from the private
-portrait dataset and skip without it (252 pass, 5 skip), and
+portrait dataset and skip without it (254 pass, 5 skip), and
 `scripts/verify_site.py`, which needs Chrome with WebGL2 and is run locally
 before publishing. No test needs a camera.
 

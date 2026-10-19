@@ -1,13 +1,12 @@
 /**
- * The page's markup: masthead, the hero around the mirror, how it works,
- * privacy, and the footer.
+ * The page's markup: masthead, the studio screen around the mirror, the
+ * lookbook, how it works, privacy, and the footer.
  *
  * Everything here is plain HTML with no behaviour, which is what lets
  * `vite.config.ts` write the same markup into index.html at build time:
  * the served page already carries its headline, its explanation and its
- * one h1 before any script runs. `mountApp` renders the same shell again
- * with the live mirror and the controls slotted in, so nothing moves when
- * it takes over.
+ * one top-level heading before any script runs. `mountApp` slots the live
+ * mirror and the controls into it, so nothing moves when it takes over.
  */
 
 import { FACTS, oneDecimal } from "./facts";
@@ -15,20 +14,26 @@ import { ICONS } from "./icons";
 
 const REPO_URL = "https://github.com/safdar-hussain1/carmine";
 
+/** One frame of a 30 fps camera, in milliseconds: the time a live frame's
+ * work has to fit in. */
+const FRAME_BUDGET_MS = 1000 / 30;
+
 export function headerHtml(): string {
   return `
   <header class="site-header">
     <div class="site-header__inner">
       <a class="wordmark" href="#top" aria-label="Carmine, back to the top"><span class="wordmark__dot" aria-hidden="true"></span>Carmine</a>
       <nav class="site-nav" aria-label="Sections">
-        <a href="#demo">Try it</a>
+        <a href="#looks">Looks</a>
         <a href="#how">How it works</a>
         <a href="#privacy">Privacy</a>
       </nav>
-      <a class="icon-link" href="${REPO_URL}" rel="noopener" aria-label="Source code on GitHub">${ICONS.github}</a>
-      <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Switch theme"
-        ><span class="theme-toggle__sun">${ICONS.sun}</span><span class="theme-toggle__moon">${ICONS.moon}</span></button
-      >
+      <div class="site-header__actions">
+        <a class="icon-link" href="${REPO_URL}" rel="noopener" aria-label="Source code on GitHub">${ICONS.github}</a>
+        <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Switch theme"
+          ><span class="theme-toggle__sun">${ICONS.sun}</span><span class="theme-toggle__moon">${ICONS.moon}</span></button
+        >
+      </div>
     </div>
   </header>`;
 }
@@ -36,24 +41,25 @@ export function headerHtml(): string {
 /** The mirror before the script arrives: the sample, in its place. */
 function stagePlaceholderHtml(): string {
   return `
-  <div class="stage" data-phase="idle" data-source="sample" data-drawn="false">
+  <div class="stage" data-source="sample" data-drawn="false">
     <img class="stage__poster" src="./demo/model.jpg" alt="The sample portrait the demo runs on" width="1600" height="1067" />
   </div>`;
 }
 
-function heroHtml(stage: string, dock: string): string {
+function heroHtml(stage: string, tools: string, bar: string): string {
   return `
-    <section class="hero" id="demo" aria-label="Demo">
-      <div class="hero__stage">${stage}</div>
-      <div class="hero__title">
-        <p class="masthead" aria-hidden="true">Carmine</p>
-        <h1>Virtual makeup that keeps your skin’s texture.</h1>
+    <section class="hero" id="demo" aria-label="Try it">
+      <div class="screen">
+        <div class="screen__media">${stage}</div>
+        <div class="screen__scrim" aria-hidden="true"></div>
+        <div class="screen__tools">${tools}</div>
       </div>
-      <div class="hero__body">
+      <div class="hero__bar">${bar}</div>
+      <div class="hero__copy">
+        <h1>Virtual makeup that keeps your skin’s texture.</h1>
         <p class="lede">
-          Lipstick, eyeshadow, liner, brows, blush and highlighter, painted onto your face live
-          through your camera. The colour changes; the texture of your skin stays. It all runs in
-          this tab, and nothing is uploaded.
+          Lipstick to highlighter, painted onto your face live through your camera. The colour
+          changes; your skin stays yours. It all runs in this tab, and nothing is uploaded.
         </p>
         <div class="cta">
           <button class="btn btn--primary" type="button" data-action="camera">${ICONS.camera}<span>Try it on your face</span></button>
@@ -61,8 +67,23 @@ function heroHtml(stage: string, dock: string): string {
         </div>
         <p class="cta__note">Your browser asks before the camera turns on.</p>
       </div>
-      <div class="hero__dock">${dock}</div>
     </section>`;
+}
+
+export function lookbookHtml(): string {
+  return `
+  <section class="lookbook" id="looks" aria-labelledby="looks-title">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 id="looks-title">Four looks. One face.</h2>
+        <p class="lede">
+          Each portrait is painted by the engine, live in your browser, from the same photo. Pick one
+          to wear it in the mirror.
+        </p>
+      </div>
+      <div class="lookbook__grid"></div>
+    </div>
+  </section>`;
 }
 
 function shiftBars(): string {
@@ -86,6 +107,28 @@ function shiftBars(): string {
           </figure>`;
 }
 
+function frameBar(): string {
+  const share = (ms: number) => `${((ms / FRAME_BUDGET_MS) * 100).toFixed(1)}%`;
+  const stages = [
+    { key: "detect", label: "Find the face", ms: FACTS.detectMs },
+    { key: "masks", label: "Build the masks", ms: FACTS.masksMs },
+    { key: "draw", label: "Paint", ms: FACTS.drawMs },
+  ];
+  return `
+          <figure class="frame">
+            <figcaption>A 30 fps camera sends a new frame every ${oneDecimal(FRAME_BUDGET_MS)} ms. All of Carmine’s work fits inside one.</figcaption>
+            <div class="frame__track">${stages
+              .map((stage) => `<span class="frame__seg frame__seg--${stage.key}" style="--w:${share(stage.ms)}"></span>`)
+              .join("")}</div>
+            <ul class="frame__legend">${stages
+              .map(
+                (stage) =>
+                  `<li><i class="frame__key frame__key--${stage.key}"></i>${stage.label} <b>${oneDecimal(stage.ms)} ms</b></li>`,
+              )
+              .join("")}<li><i class="frame__key frame__key--spare"></i>Room to spare</li></ul>
+          </figure>`;
+}
+
 interface Chapter {
   key: string;
   title: string;
@@ -97,23 +140,26 @@ const CHAPTERS: Chapter[] = [
   {
     key: "landmarks",
     title: "Find the face",
-    body: `A face landmark model finds ${FACTS.landmarks} points on your face and joins them into a mesh. Everything after this is placed from those points and scaled to the distance between your eyes.`,
+    body: "A face landmark model fits a mesh to your face, with a depth for every point. Everything after this is placed from those points and scaled to the distance between your eyes. Drag the face to turn it.",
+    extra: `
+          <p class="count"><span class="count__value" data-count="${FACTS.landmarks}">${FACTS.landmarks}</span><span class="count__label">points, found again on every frame</span></p>`,
   },
   {
     key: "masks",
-    title: "Draw soft masks",
-    body: "Lips, lids, lash line, brows, cheeks and highlights each get a soft-edged shape. The edges soften in proportion to your face, so they stay soft as you lean in.",
+    title: "Shape soft masks",
+    body: "Lips, lids, lash line, brows, cheeks and highlights each get a soft-edged shape of their own. The edges soften in proportion to your face, so they stay soft as you lean in.",
   },
   {
     key: "texture",
     title: "Change the colour, keep the texture",
-    body: "Colour is changed in CIELAB, where lightness is separate from hue. A flat fill paints over the lip; Carmine moves the colour and keeps the lip’s own light and shadow. Drag across the picture to compare.",
+    body: "Every pixel of a lip is a point in colour space: lightness up the middle, hue around it. A flat fill lifts the whole lip toward white. Carmine moves the colour and lets the lightness move only a little, so the lip keeps its own light and shadow.",
     extra: shiftBars(),
   },
   {
     key: "final",
     title: "Paint it in one pass",
-    body: `All six products are drawn in a single pass on your graphics card. The whole pipeline takes ${oneDecimal(FACTS.frameMs)} ms a frame on an ${FACTS.gpu} laptop, about ${oneDecimal(FACTS.fps)} frames a second.`,
+    body: `All six products are drawn in a single pass on your graphics card, in the order the sheets were stacked. The whole pipeline takes ${oneDecimal(FACTS.frameMs)} ms a frame on an ${FACTS.gpu} laptop, about ${oneDecimal(FACTS.fps)} frames a second.`,
+    extra: frameBar(),
   },
 ];
 
@@ -126,14 +172,11 @@ export function howItWorksHtml(): string {
           <p class="chapter__body">${chapter.body}</p>${chapter.extra ?? ""}
         </li>`,
   ).join("");
-  const canvases = CHAPTERS.map(
-    (chapter) => `<canvas class="story__canvas" data-step="${chapter.key}" aria-hidden="true"></canvas>`,
-  ).join("");
 
   return `
   <section class="story" id="how" aria-labelledby="how-title">
     <div class="wrap">
-      <div class="story__intro">
+      <div class="section-head">
         <h2 id="how-title">How it works</h2>
         <p class="lede">
           The same four steps run on every camera frame, in the time between one frame and the next.
@@ -142,10 +185,18 @@ export function howItWorksHtml(): string {
       </div>
       <div class="story__layout">
         <div class="story__visual">
-          <div class="story__frame" data-active="landmarks">
-            ${canvases}
-            <span class="story__tag story__tag--left">Flat fill</span>
-            <span class="story__tag story__tag--right">Carmine</span>
+          <div class="story__stage" data-scene="landmarks">
+            <canvas class="scene scene--mesh" role="img" aria-label="The face's landmark mesh in 3D. Drag to turn it."></canvas>
+            <div class="scene scene--layers" role="img" aria-label="The look as six sheets, one per product, stacked over the face in the order they are painted."></div>
+            <div class="scene scene--cloud">
+              <canvas class="cloud__canvas" role="img" aria-label="Every pixel of the lip as a dot in colour space, lightness pointing up."></canvas>
+              <div class="cloud__chips" role="group" aria-label="Show the lip">
+                <button class="cloud__chip" type="button" data-state="original" aria-pressed="true">Your lip</button>
+                <button class="cloud__chip" type="button" data-state="flat" aria-pressed="false">Flat fill</button>
+                <button class="cloud__chip" type="button" data-state="carmine" aria-pressed="false">Carmine</button>
+              </div>
+              <div class="cloud__inset" aria-hidden="true"><canvas data-state="original"></canvas><canvas data-state="flat"></canvas><canvas data-state="carmine"></canvas></div>
+            </div>
             <div class="story__progress" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
           </div>
         </div>
@@ -185,7 +236,7 @@ export function privacyHtml(): string {
         <li>
           <span class="privacy__icon">${ICONS.wifiOff}</span>
           <h3>Check it yourself</h3>
-          <p>Once the mirror is running, turn off your Wi-Fi. It keeps working, because it no longer needs the network.</p>
+          <p>Once the camera is running, turn off your Wi-Fi. It keeps working, because it no longer needs the network.</p>
         </li>
       </ul>
     </div>
@@ -213,21 +264,21 @@ export function footerHtml(): string {
  * The whole page, with anything the app mounts slotted in.
  *
  * Called with no arguments this is the script-free page the build writes
- * into index.html: the sample stands where the mirror will go, and an
- * empty, reserved slot stands where the controls will go.
+ * into index.html: the sample stands where the mirror will go, and empty,
+ * reserved slots stand where its buttons and the shade bar will go.
  */
 export function shellHtml(
   stage = stagePlaceholderHtml(),
-  dock = '<div class="dock dock--pending"></div>',
-  drawer = "",
+  tools = '<div class="tools tools--pending"></div>',
+  bar = '<div class="bar bar--pending"></div>',
 ): string {
   return `
   ${headerHtml()}
   <main id="top">
-    ${heroHtml(stage, dock)}
+    ${heroHtml(stage, tools, bar)}
+    ${lookbookHtml()}
     ${howItWorksHtml()}
     ${privacyHtml()}
   </main>
-  ${footerHtml()}
-  ${drawer}`;
+  ${footerHtml()}`;
 }

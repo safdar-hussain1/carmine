@@ -38,18 +38,19 @@ export function coverFit(
   };
 }
 
-function axisFocus(box: number, drawn: number, point: number): number {
+function axisFocus(box: number, drawn: number, point: number, aim: number): number {
   const overflow = box - drawn;
   if (overflow > -1e-9) {
     return 0.5;
   }
-  const wanted = box / 2 - point;
+  const wanted = box * aim - point;
   return Math.min(Math.max(wanted / overflow, 0), 1);
 }
 
 /**
  * The object-position that brings picture point (px, py) as close to the
- * middle of the box as the crop allows, without showing past an edge.
+ * aim point of the box -- (ax, ay) as fractions, the middle by default -- as
+ * the crop allows, without showing past an edge.
  */
 export function focusOn(
   boxW: number,
@@ -58,11 +59,13 @@ export function focusOn(
   contentH: number,
   px: number,
   py: number,
+  ax = 0.5,
+  ay = 0.5,
 ): { fx: number; fy: number } {
   const scale = Math.max(boxW / contentW, boxH / contentH);
   return {
-    fx: axisFocus(boxW, contentW * scale, px * scale),
-    fy: axisFocus(boxH, contentH * scale, py * scale),
+    fx: axisFocus(boxW, contentW * scale, px * scale, ax),
+    fy: axisFocus(boxH, contentH * scale, py * scale, ay),
   };
 }
 

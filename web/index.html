@@ -93,6 +93,7 @@
       // Applied before the first paint: reading the stored theme from a
       // module would be one load too late and would flash the wrong ground
       // colour. Kept in sync with ui/theme.ts's THEME_KEY.
+      document.documentElement.classList.add("js");
       try {
         var carmineTheme = localStorage.getItem("carmine.theme");
         if (carmineTheme === "light" || carmineTheme === "dark") {

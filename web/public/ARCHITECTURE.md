@@ -91,8 +91,10 @@ Nothing crosses between the surfaces at runtime. They meet only at build time
 | `lib/camera.ts` | getUserMedia lifecycle |
 | `ui/pipeline.ts` | shared landmarker, gloss percentiles, CPU still-render fallback |
 | `ui/scene.ts` | a still picture analysed once: landmarks, every mask, gloss percentiles |
-| `ui/mirror.ts`, `ui/controls.ts`, `ui/story.ts`, `ui/sections.ts` | the page: the mirror and its opening scan, the dock and the drawer of every product, how it works told as you scroll, the markup |
-| `ui/tween.ts`, `ui/geometry.ts`, `ui/facts.ts`, `ui/shades.ts` | blending between looks, the cover-crop mapping, the figures the page quotes, the shade catalogue |
+| `ui/app.ts`, `ui/mirror.ts`, `ui/controls.ts`, `ui/lookbook.ts`, `ui/story.ts`, `ui/sections.ts` | the page: one owner for the look, the mirror and its opening scan, the shade bar with every product, the four looks painted side by side, how it works told as you scroll, the markup |
+| `ui/sample.ts`, `ui/offscreen.ts` | the sample portrait's shipped landmarks; one shared offscreen renderer that paints any look of a still for the pictures around the mirror |
+| `ui/mesh3d.ts`, `ui/meshArt.ts`, `ui/layers.ts`, `ui/colorCloud.ts`, `ui/cloudArt.ts` | the story's pictures: the landmark mesh turned in 3D, the masks as stacked sheets, a lip's pixels as a cloud in CIELAB |
+| `ui/tween.ts`, `ui/geometry.ts`, `ui/facts.ts`, `ui/shades.ts`, `ui/theme.ts`, `ui/icons.ts` | blending between looks, the cover-crop mapping, the figures the page quotes, the shade catalogue, the light and dark switch, the icons |
 
 ---
 
@@ -126,6 +128,14 @@ against unit by unit. Constants keep the two sides configured identically;
 vectors keep them *computing* identically. The sync test compares the vectors
 as data rather than bytes — integers exactly, floats to 1e-3 — because the
 float32 colour conversion rounds differently on another CPU.
+
+`scripts/export_sample_landmarks.py` runs the same face model over the sample
+portrait once and writes its 478 points, with depth, to
+`web/src/gen/sample_landmarks.json`. The page builds the sample's masks and
+paints its looks from those points with its own engine, so the demo, the looks
+and the story play without downloading the model, which is fetched only for a
+camera or a photo. `tests/test_sample_landmarks_sync.py` runs the model again
+and fails if any coordinate has moved by more than two pixels.
 
 `scripts/export_parity_fixtures.py` writes the third layer: canned frames,
 their landmarks, and the Python engine's own renders under three looks. Those

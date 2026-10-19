@@ -12,6 +12,10 @@
  * Masks are the live construction, the same ones the mirror paints photos
  * with whenever WebGL2 is available. Gloss percentiles are measured on the
  * untinted picture, which is how the live shader path measures them too.
+ *
+ * A scene can start from a detection (`analyzePhoto`, for a visitor's own
+ * photo) or from landmarks found ahead of time (`sceneFromLandmarks`, for the
+ * sample portrait, which then needs no face model at all).
  */
 
 import { PRODUCT_ORDER, type LookConfig } from "../engine/look";
@@ -43,6 +47,8 @@ export interface PhotoScene {
   masks: MaskSet;
   gloss: { highlighter: GlossPercentiles | null; lipstick: GlossPercentiles | null };
   face: FaceBox;
+  /** Depth per landmark, when it is known (the sample's, found ahead of time). */
+  depth?: Float32Array;
 }
 
 const EVERY_PRODUCT = new Set<string>(PRODUCT_ORDER);
@@ -92,6 +98,17 @@ export async function analyzePhoto(
   if (landmarks === null) {
     return null;
   }
+  return sceneFromLandmarks(source, width, height, landmarks);
+}
+
+/** Builds everything a render needs from landmarks that are already known. */
+export function sceneFromLandmarks(
+  source: StillSource,
+  width: number,
+  height: number,
+  landmarks: Float32Array,
+  depth?: Float32Array,
+): PhotoScene {
   const masks = buildMasks(landmarks, width, height, EVERY_PRODUCT, "live");
 
   // Sized to the mask set: the percentile reduction walks the mask and the
@@ -107,7 +124,7 @@ export async function analyzePhoto(
     };
   }
 
-  return { source, width, height, landmarks, masks, gloss, face: faceBox(landmarks) };
+  return { source, width, height, landmarks, masks, gloss, face: faceBox(landmarks), depth };
 }
 
 /** The gloss inputs a look actually uses on this scene. */
